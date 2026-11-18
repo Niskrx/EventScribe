@@ -46,6 +46,9 @@ export default function LoginPage() {
           </button>
           {message ? <p className="text-sm text-[var(--muted)]" role="status">{message}</p> : null}
         </form>
+        <Link href="/signup" className="mt-5 block text-center text-sm font-semibold text-[var(--brand)]">
+          Create a new account
+        </Link>
         <Link href="/dashboard" className="mt-6 block rounded-lg bg-[var(--brand)] px-4 py-3 text-center font-semibold text-white">Continue to demo dashboard</Link>
       </section>
     </main>
