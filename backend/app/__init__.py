@@ -1,0 +1,1 @@
+"""EventScribe FastAPI application."""

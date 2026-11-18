@@ -1,5 +1,21 @@
 # EventScribe Frontend
 
-The Next.js and Tailwind CSS frontend will contain authentication screens, the professor dashboard, event and format forms, upload controls, report editing, preview, downloads, and report history.
+The frontend is a Next.js application with TypeScript and Tailwind CSS. It contains the professor-facing shell that will grow into authentication, event and format forms, uploads, report editing, preview, downloads, and report history.
 
-The frontend must call the FastAPI backend for application operations. It must never call Gemini directly or contain secret credentials.
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+Useful checks:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+The frontend calls the FastAPI backend through `NEXT_PUBLIC_API_BASE_URL`. It must never call Gemini directly or contain secret credentials.
