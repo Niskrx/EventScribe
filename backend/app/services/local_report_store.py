@@ -89,3 +89,11 @@ def fail_report(report: LocalReport, error: str) -> ReportResponse:
     report.status = "failed"
     report.last_error = error
     return report_response(report)
+
+
+def update_report_content(report: LocalReport, content: ReportContent) -> ReportResponse:
+    report.content_version += 1
+    report.content_json = content
+    report.status = "draft"
+    report.last_error = None
+    return report_response(report)

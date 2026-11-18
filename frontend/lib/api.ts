@@ -17,6 +17,22 @@ export type EventDraft = {
 
 export type CreatedEvent = EventDraft & { id: string; user_id: string; status: string };
 
+export type ReportBlock = { kind: "paragraph" | "bullet" | "numbered"; text: string; items: string[] };
+export type ReportSection = { key: string; title: string; blocks: ReportBlock[]; needs_review: boolean; review_notes: string[] };
+export type ReportContent = { schema_version: "1.0"; title: string; sections: ReportSection[]; missing_facts: string[] };
+export type ReportResponse = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  content_json: ReportContent | null;
+  content_version: number;
+  status: "draft" | "generating" | "ready" | "failed";
+  generation_model: string | null;
+  prompt_version: string | null;
+  last_error: string | null;
+  created_at: string;
+};
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
@@ -53,4 +69,18 @@ export async function uploadEventPhoto(eventId: string, file: File, caption?: st
     body: formData,
   });
   await parseResponse(response);
+}
+
+export async function getReport(reportId: string): Promise<ReportResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/reports/${reportId}`, { cache: "no-store" });
+  return parseResponse<ReportResponse>(response);
+}
+
+export async function updateReportContent(reportId: string, content: ReportContent): Promise<ReportResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/reports/${reportId}/content`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(content),
+  });
+  return parseResponse<ReportResponse>(response);
 }

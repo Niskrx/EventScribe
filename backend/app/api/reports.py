@@ -4,11 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import get_request_user_id
 from app.config import Settings, get_settings
-from app.schemas.reports import ReportResponse
+from app.schemas.reports import ReportContent, ReportResponse
 from app.services.ai.gemini import GeminiAdapter, GeminiError
 from app.services.local_event_store import event_response, get_event
 from app.services.local_format_store import get_local_profile_record
-from app.services.local_report_store import fail_report, finish_report, get_event_report, get_report, report_response, start_report
+from app.services.local_report_store import (
+    fail_report,
+    finish_report,
+    get_event_report,
+    get_report,
+    report_response,
+    start_report,
+    update_report_content,
+)
 
 router = APIRouter(prefix="/api", tags=["reports"])
 PROMPT_VERSION = "format-report-v1"
@@ -55,3 +63,17 @@ async def read_report(report_id: UUID, user_id: str = Depends(get_request_user_i
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found.")
     return report_response(report)
+
+
+@router.patch("/reports/{report_id}/content", response_model=ReportResponse)
+async def edit_report_content(
+    report_id: UUID,
+    content: ReportContent,
+    user_id: str = Depends(get_request_user_id),
+) -> ReportResponse:
+    report = get_report(report_id, user_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if not content.sections:
+        raise HTTPException(status_code=422, detail="A report must contain at least one section.")
+    return update_report_content(report, content)
