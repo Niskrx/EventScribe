@@ -34,3 +34,5 @@ ruff check app tests
 Runtime dependencies and test dependencies are pinned in `requirements.txt`. Keep the virtual environment local and do not commit it.
 
 The backend owns all provider secrets and must validate every AI response before using it.
+
+For production, use `Dockerfile` so LibreOffice is available for PDF conversion. See the repository-level `docs/DEPLOYMENT.md` before configuring a host.

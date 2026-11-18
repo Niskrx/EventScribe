@@ -10,6 +10,8 @@ The project’s primary differentiator is dynamic format understanding. The appl
 - [Contribution Guide](docs/CONTRIBUTING.md)
 - [Architecture Notes](docs/architecture.md)
 - [Testing Guide](docs/testing.md)
+- [Deployment Readiness](docs/DEPLOYMENT.md)
+- [Demo Runbook](docs/DEMO_RUNBOOK.md)
 
 ## Planned stack
 
@@ -76,6 +78,8 @@ Use `frontend/.env.local.example` for browser-safe variables and `backend/.env.e
 | Backend | `ruff check app tests` | Run Python lint checks |
 | Backend | `pytest` | Run backend tests |
 | Backend | `python -m compileall -q app tests && ruff check app tests && pytest` | Run backend verification |
+
+GitHub Actions runs the same frontend and backend verification on pushes and pull requests to `main`.
 
 Dependency strategy: frontend dependencies are pinned in `frontend/package.json` and `frontend/package-lock.json`; backend runtime and test dependencies are pinned in `backend/requirements.txt`. A generated Python environment is never committed. A release lock/export can be produced later if deployment requires one.
 
