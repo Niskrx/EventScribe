@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function DashboardPage() {
   return (
@@ -24,6 +25,12 @@ export default function DashboardPage() {
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{description}</p>
             </article>
           ))}
+        </section>
+        <section className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold">Recent reports</h2>
+          <div className="mt-4">
+            <EmptyState title="No reports yet" description="Your generated reports will appear here after you complete the report workflow." />
+          </div>
         </section>
       </div>
     </AppShell>
