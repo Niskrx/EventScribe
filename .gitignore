@@ -33,6 +33,8 @@ backend/.venv/
 # Generated documents and private uploads
 generated/
 uploads/
+.local_storage/
+backend/.local_storage/
 *.docx
 *.pdf
 *.png

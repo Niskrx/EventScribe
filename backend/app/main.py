@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
 from app.api.me import router as me_router
+from app.api.formats import router as formats_router
 from app.config import get_settings
 from app.schemas.errors import ErrorResponse
 
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(me_router)
+    app.include_router(formats_router)
     return app
 
 

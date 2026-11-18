@@ -44,3 +44,17 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication response.")
 
     return CurrentUser(id=user_id, email=payload.get("email"))
+
+
+async def get_request_user_id(
+    authorization: str | None = Header(default=None),
+    x_eventscribe_user: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> str:
+    """Use Supabase identity in configured environments and a clearly local-only user otherwise."""
+    if authorization:
+        user = await get_current_user(authorization=authorization, settings=settings)
+        return user.id
+    if settings.environment == "development":
+        return x_eventscribe_user or "local-dev-user"
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required.")
