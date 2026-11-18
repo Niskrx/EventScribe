@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
+from app.api.me import router as me_router
 from app.config import get_settings
 from app.schemas.errors import ErrorResponse
 
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
 
     app.include_router(health_router)
+    app.include_router(me_router)
     return app
 
 

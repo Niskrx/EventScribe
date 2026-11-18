@@ -1,0 +1,2 @@
+# Local Supabase CLI configuration will be added when local database workflows are enabled.
+# The SQL migrations in supabase/migrations are the source of truth for the schema.

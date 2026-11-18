@@ -60,7 +60,7 @@ uvicorn app.main:app --reload --port 8000
 
 The frontend runs at `http://localhost:3000`. The backend health endpoint is `http://localhost:8000/api/health`.
 
-Copy environment values into the frontend/backend environment files only when needed. Never commit populated `.env` files, API keys, private uploads, or generated report files.
+Use `frontend/.env.local.example` for browser-safe variables and `backend/.env.example` for server variables. Copy them to `.env.local` and `.env` respectively only when needed. Never commit populated environment files, API keys, private uploads, or generated report files.
 
 ## Command reference
 
