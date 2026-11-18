@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { EventForm } from "@/components/EventForm";
 
 export default function NewReportPage() {
   return (
@@ -7,7 +8,7 @@ export default function NewReportPage() {
       <div className="max-w-3xl">
         <Link href="/dashboard" className="text-sm font-semibold text-[var(--brand)]">← Back to dashboard</Link>
         <h1 className="mt-4 text-4xl font-bold">Create a report</h1>
-        <p className="mt-3 text-[var(--muted)]">The format upload, event form, and photograph workflow will be implemented in the next milestones.</p>
+        <p className="mt-3 text-[var(--muted)]">Save verified event facts and photographs as a draft. Format selection and AI analysis will connect in the next workflow step.</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
             ["1", "Choose a format", "Upload a PDF/DOCX reference or describe your format."],
@@ -20,6 +21,9 @@ export default function NewReportPage() {
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{description}</p>
             </article>
           ))}
+        </div>
+        <div className="mt-8">
+          <EventForm />
         </div>
       </div>
     </AppShell>
