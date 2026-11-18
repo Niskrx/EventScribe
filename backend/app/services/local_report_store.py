@@ -55,6 +55,12 @@ def get_event_report(event_id: UUID, user_id: str) -> LocalReport | None:
     return None
 
 
+def list_reports(user_id: str) -> list[ReportResponse]:
+    reports = [report for report in _reports.values() if report.user_id == user_id]
+    reports.sort(key=lambda report: report.created_at, reverse=True)
+    return [report_response(report) for report in reports]
+
+
 def start_report(event_id: UUID, user_id: str, model: str | None, prompt_version: str) -> LocalReport:
     existing = get_event_report(event_id, user_id)
     if existing is not None:
@@ -117,3 +123,13 @@ def set_pdf_path(report: LocalReport, storage_path: str) -> ReportResponse:
     report.status = "ready"
     report.last_error = None
     return report_response(report)
+
+
+def delete_report(report: LocalReport, storage_root) -> None:
+    for storage_path in (report.docx_storage_path, report.pdf_storage_path):
+        if storage_path:
+            path = (storage_root / storage_path).resolve()
+            root = storage_root.resolve()
+            if root in path.parents and path.exists():
+                path.unlink()
+    _reports.pop(report.id, None)

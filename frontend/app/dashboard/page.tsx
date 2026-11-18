@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/EmptyState";
+import { ReportHistory } from "@/components/ReportHistory";
 
 export default function DashboardPage() {
   return (
@@ -29,7 +29,7 @@ export default function DashboardPage() {
         <section className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Recent reports</h2>
           <div className="mt-4">
-            <EmptyState title="No reports yet" description="Your generated reports will appear here after you complete the report workflow." />
+            <ReportHistory />
           </div>
         </section>
       </div>

@@ -16,6 +16,8 @@ from app.services.local_report_store import (
     finish_report,
     get_event_report,
     get_report,
+    list_reports,
+    delete_report,
     report_response,
     set_pdf_path,
     start_report,
@@ -64,12 +66,38 @@ async def read_event_report(event_id: UUID, user_id: str = Depends(get_request_u
     return report_response(report)
 
 
+@router.get("/reports", response_model=list[ReportResponse])
+async def read_report_history(user_id: str = Depends(get_request_user_id)) -> list[ReportResponse]:
+    return list_reports(user_id)
+
+
 @router.get("/reports/{report_id}", response_model=ReportResponse)
 async def read_report(report_id: UUID, user_id: str = Depends(get_request_user_id)) -> ReportResponse:
     report = get_report(report_id, user_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found.")
     return report_response(report)
+
+
+@router.post("/reports/{report_id}/retry", response_model=ReportResponse)
+async def retry_report(
+    report_id: UUID,
+    user_id: str = Depends(get_request_user_id),
+    settings: Settings = Depends(get_settings),
+) -> ReportResponse:
+    report = get_report(report_id, user_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    return await generate_event_report(report.event_id, user_id, settings)
+
+
+@router.delete("/reports/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_report(report_id: UUID, user_id: str = Depends(get_request_user_id)) -> None:
+    report = get_report(report_id, user_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    storage_root = Path(__file__).resolve().parents[2] / ".local_storage"
+    delete_report(report, storage_root)
 
 
 @router.patch("/reports/{report_id}/content", response_model=ReportResponse)

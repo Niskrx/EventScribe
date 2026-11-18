@@ -84,3 +84,18 @@ export async function updateReportContent(reportId: string, content: ReportConte
   });
   return parseResponse<ReportResponse>(response);
 }
+
+export async function listReports(): Promise<ReportResponse[]> {
+  const response = await fetch(`${apiBaseUrl}/api/reports`, { cache: "no-store" });
+  return parseResponse<ReportResponse[]>(response);
+}
+
+export async function retryReport(reportId: string): Promise<ReportResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/reports/${reportId}/retry`, { method: "POST" });
+  return parseResponse<ReportResponse>(response);
+}
+
+export async function deleteReport(reportId: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/reports/${reportId}`, { method: "DELETE" });
+  await parseResponse(response);
+}
