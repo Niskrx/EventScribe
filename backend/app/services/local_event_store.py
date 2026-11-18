@@ -148,6 +148,10 @@ def get_photo(photo_id: UUID, event: LocalEvent) -> LocalPhoto | None:
     return photo
 
 
+def list_event_photos(event: LocalEvent) -> list[LocalPhoto]:
+    return [_photos[photo_id] for photo_id in event.photos if photo_id in _photos]
+
+
 def reorder_photos(event: LocalEvent, ordered_photo_ids: list[UUID]) -> list[PhotoResponse]:
     if set(ordered_photo_ids) != set(event.photos) or len(ordered_photo_ids) != len(event.photos):
         raise ValueError("The photo order must include every photo exactly once.")

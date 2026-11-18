@@ -16,6 +16,8 @@ class LocalReport:
     generation_model: str | None
     prompt_version: str | None
     last_error: str | None
+    docx_storage_path: str | None
+    pdf_storage_path: str | None
     created_at: datetime
 
 
@@ -33,6 +35,8 @@ def report_response(report: LocalReport) -> ReportResponse:
         generation_model=report.generation_model,
         prompt_version=report.prompt_version,
         last_error=report.last_error,
+        docx_storage_path=report.docx_storage_path,
+        pdf_storage_path=report.pdf_storage_path,
         created_at=report.created_at,
     )
 
@@ -70,6 +74,8 @@ def start_report(event_id: UUID, user_id: str, model: str | None, prompt_version
         generation_model=model,
         prompt_version=prompt_version,
         last_error=None,
+        docx_storage_path=None,
+        pdf_storage_path=None,
         created_at=datetime.now(timezone.utc),
     )
     _reports[report.id] = report
@@ -95,5 +101,12 @@ def update_report_content(report: LocalReport, content: ReportContent) -> Report
     report.content_version += 1
     report.content_json = content
     report.status = "draft"
+    report.last_error = None
+    return report_response(report)
+
+
+def set_docx_path(report: LocalReport, storage_path: str) -> ReportResponse:
+    report.docx_storage_path = storage_path
+    report.status = "ready"
     report.last_error = None
     return report_response(report)

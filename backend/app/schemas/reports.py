@@ -36,4 +36,6 @@ class ReportResponse(BaseModel):
     generation_model: str | None = None
     prompt_version: str | None = None
     last_error: str | None = None
+    docx_storage_path: str | None = None
+    pdf_storage_path: str | None = None
     created_at: datetime
