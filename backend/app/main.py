@@ -15,6 +15,13 @@ from app.schemas.errors import ErrorResponse
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    allowed_origins = {
+        origin.strip()
+        for origin in settings.frontend_origin.split(",")
+        if origin.strip()
+    }
+    if settings.environment == "production":
+        allowed_origins.add("https://frontend-two-olive-91.vercel.app")
     app = FastAPI(
         title="EventScribe API",
         version="0.1.0",
@@ -22,7 +29,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_origin],
+        allow_origins=sorted(allowed_origins),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
