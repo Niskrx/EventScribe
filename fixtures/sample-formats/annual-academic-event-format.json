@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "source_type": "text",
+  "document_title_rule": "Use the verified event title.",
+  "sections": [
+    {"key": "overview", "title": "Event Overview", "order": 1, "required": true, "content_type": "paragraphs", "heading_level": 1},
+    {"key": "activities", "title": "Activities", "order": 2, "required": true, "content_type": "bullets", "heading_level": 2},
+    {"key": "outcomes", "title": "Outcomes", "order": 3, "required": true, "content_type": "paragraphs", "heading_level": 2}
+  ],
+  "style": {
+    "font_family": "Arial",
+    "body_font_size_pt": 11,
+    "heading_alignment": "center",
+    "body_alignment": "justify",
+    "line_spacing": 1.15,
+    "margins": {"top_cm": 2.54, "right_cm": 2.54, "bottom_cm": 2.54, "left_cm": 2.54}
+  },
+  "images": {"mode": "grid", "columns": 2, "captions": true},
+  "tables": [{"name": "Attendance summary", "columns": ["Category", "Count"]}],
+  "uncertainties": ["Attendance counts must come only from verified event facts."]
+}
