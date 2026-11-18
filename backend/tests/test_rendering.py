@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 
@@ -9,6 +10,7 @@ from app.schemas.format_spec import FormatSpecification
 from app.schemas.reports import ReportContent
 from app.services.local_format_store import get_local_profile_record, mark_local_profile_analysis
 from app.services.local_report_store import finish_report, start_report
+from app.services.rendering.pdf_converter import find_libreoffice
 
 client = TestClient(app)
 
@@ -66,6 +68,10 @@ def test_docx_render_endpoint_creates_editable_document() -> None:
     assert "Rendering Demo" in "\n".join(paragraph.text for paragraph in document.paragraphs)
 
     pdf_response = client.post(f"/api/reports/{report.id}/convert-pdf")
+    if find_libreoffice() is None:
+        assert pdf_response.status_code == 503
+        assert pdf_response.json()["error"]["message"] == "LibreOffice is not available on this server."
+        pytest.skip("LibreOffice/soffice is unavailable; PDF output verification is environment-dependent.")
     assert pdf_response.status_code == 200
     pdf_storage_path = pdf_response.json()["pdf_storage_path"]
     assert pdf_storage_path.endswith(".pdf")
@@ -75,3 +81,6 @@ def test_docx_render_endpoint_creates_editable_document() -> None:
     download_response = client.get(f"/api/reports/{report.id}/download/pdf")
     assert download_response.status_code == 200
     assert download_response.headers["content-type"] == "application/pdf"
+    assert "event-report.pdf" in download_response.headers["content-disposition"]
+    assert download_response.content.startswith(b"%PDF")
+    assert len(download_response.content) > 0
