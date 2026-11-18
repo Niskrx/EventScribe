@@ -1,6 +1,10 @@
 from functools import lru_cache
+import logging
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+logger = logging.getLogger("eventscribe.config")
 
 
 class Settings(BaseSettings):
@@ -25,4 +29,15 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    warnings = []
+
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        warnings.append("Supabase integration is not configured; authentication and persistence are disabled.")
+    if not settings.gemini_api_key or not settings.gemini_model:
+        warnings.append("Gemini integration is not configured; AI analysis and generation are disabled.")
+
+    for warning in warnings:
+        logger.warning(warning)
+
+    return settings

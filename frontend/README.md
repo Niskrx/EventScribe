@@ -16,6 +16,7 @@ Useful checks:
 ```bash
 npm run typecheck
 npm run build
+npm run verify
 ```
 
 The frontend calls the FastAPI backend through `NEXT_PUBLIC_API_BASE_URL`. It must never call Gemini directly or contain secret credentials.

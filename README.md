@@ -33,11 +33,49 @@ PRD.md          Product requirements and team execution plan
 
 ## Local setup
 
-The application code is being added incrementally. Before running the full application:
+Requirements:
 
-1. Copy `.env.example` to the appropriate local environment files.
-2. Follow the setup instructions in the frontend and backend README files once those applications are scaffolded.
-3. Never commit `.env` files, API keys, private uploads, or generated report files.
+- Node.js 20 or newer
+- Python 3.11 or newer
+- Git
+
+From the repository root:
+
+```bash
+cp .env.example .env.local.example  # reference only; do not commit a populated copy
+cd frontend
+npm install
+npm run dev
+```
+
+In a second terminal:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+The frontend runs at `http://localhost:3000`. The backend health endpoint is `http://localhost:8000/api/health`.
+
+Copy environment values into the frontend/backend environment files only when needed. Never commit populated `.env` files, API keys, private uploads, or generated report files.
+
+## Command reference
+
+| Area | Command | Purpose |
+|---|---|---|
+| Frontend | `npm run dev` | Start the Next.js development server |
+| Frontend | `npm run typecheck` | Run the TypeScript compiler without emitting files |
+| Frontend | `npm run build` | Create a production build |
+| Frontend | `npm run verify` | Run frontend typecheck and production build |
+| Backend | `uvicorn app.main:app --reload --port 8000` | Start the FastAPI development server |
+| Backend | `python -m compileall -q app tests` | Check Python syntax |
+| Backend | `pytest` | Run backend tests |
+| Backend | `python -m compileall -q app tests && pytest` | Run backend verification |
+
+Dependency strategy: frontend dependencies are pinned in `frontend/package.json` and `frontend/package-lock.json`; backend runtime and test dependencies are pinned in `backend/requirements.txt`. A generated Python environment is never committed. A release lock/export can be produced later if deployment requires one.
 
 ## Team
 

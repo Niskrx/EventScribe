@@ -19,4 +19,12 @@ Run tests with:
 pytest
 ```
 
+Run the complete backend verification with:
+
+```bash
+python -m compileall -q app tests && pytest
+```
+
+Runtime dependencies and test dependencies are pinned in `requirements.txt`. Keep the virtual environment local and do not commit it.
+
 The backend owns all provider secrets and must validate every AI response before using it.
