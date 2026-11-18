@@ -6,6 +6,7 @@ import httpx
 from app.config import Settings
 from app.schemas.format_spec import FormatSpecification
 from app.schemas.formats import ExtractedFormatInput
+from app.schemas.reports import ReportContent
 
 
 class GeminiError(RuntimeError):
@@ -53,6 +54,20 @@ class GeminiAdapter:
             raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned a mismatched source type.")
         return specification
 
+    async def generate_report_content(self, event_facts: dict, specification: FormatSpecification) -> ReportContent:
+        prompt = build_report_content_prompt(event_facts, specification)
+        raw_json = await self.generate_json(prompt, ReportContent.model_json_schema())
+        try:
+            content = ReportContent.model_validate_json(raw_json)
+        except ValueError as exc:
+            raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned JSON that did not match the report schema.") from exc
+
+        expected_keys = {section.key for section in specification.sections}
+        actual_keys = {section.key for section in content.sections}
+        if expected_keys != actual_keys:
+            raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned report sections that do not match the approved format.")
+        return content
+
     async def generate_json(self, prompt: str, schema: dict[str, Any]) -> str:
         if not self.settings.gemini_api_key or not self.settings.gemini_model:
             raise GeminiError("AI_NOT_CONFIGURED", "Gemini is not configured for this environment.")
@@ -92,3 +107,15 @@ class GeminiAdapter:
             return payload["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned no usable structured output.") from exc
+
+
+def build_report_content_prompt(event_facts: dict, specification: FormatSpecification) -> str:
+    return (
+        "Write a professional academic event report using only the verified event facts below. "
+        "Do not invent names, dates, attendance numbers, quotes, activities, awards, outcomes, or "
+        "other facts. If a requested detail is absent, leave it out and add a concise review note "
+        "or include it in missing_facts. Return only JSON matching the report content schema. "
+        "Use the exact section keys and titles from the approved format specification.\n\n"
+        f"Verified event facts:\n{json.dumps(event_facts, ensure_ascii=False, default=str)}\n\n"
+        f"Approved format specification:\n{specification.model_dump_json()}"
+    )
