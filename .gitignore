@@ -1,0 +1,55 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+frontend/.turbo/
+frontend/.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+backend/.venv/
+*.egg-info/
+
+# Generated documents and private uploads
+generated/
+uploads/
+*.docx
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+!fixtures/sample-images/.gitkeep
+!fixtures/sample-formats/.gitkeep
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# Test and build output
+coverage/
+htmlcov/
+dist/
+build/
