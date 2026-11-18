@@ -65,3 +65,14 @@ def test_docx_render_endpoint_creates_editable_document() -> None:
     assert output_path.exists()
     document = Document(output_path)
     assert "Rendering Demo" in "\n".join(paragraph.text for paragraph in document.paragraphs)
+
+    pdf_response = client.post(f"/api/reports/{report.id}/convert-pdf")
+    assert pdf_response.status_code == 200
+    pdf_storage_path = pdf_response.json()["pdf_storage_path"]
+    assert pdf_storage_path.endswith(".pdf")
+    pdf_path = Path(__file__).resolve().parents[1] / ".local_storage" / pdf_storage_path
+    assert pdf_path.exists()
+
+    download_response = client.get(f"/api/reports/{report.id}/download/pdf")
+    assert download_response.status_code == 200
+    assert download_response.headers["content-type"] == "application/pdf"

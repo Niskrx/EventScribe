@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 
 from app.auth import get_request_user_id
 from app.config import Settings, get_settings
@@ -16,11 +17,13 @@ from app.services.local_report_store import (
     get_event_report,
     get_report,
     report_response,
+    set_pdf_path,
     start_report,
     set_docx_path,
     update_report_content,
 )
 from app.services.rendering.docx_renderer import render_docx
+from app.services.rendering.pdf_converter import PdfConversionError, convert_docx_to_pdf
 
 router = APIRouter(prefix="/api", tags=["reports"])
 PROMPT_VERSION = "format-report-v1"
@@ -112,3 +115,50 @@ async def render_report_docx(
         raise HTTPException(status_code=500, detail=report.last_error) from exc
 
     return set_docx_path(report, str(relative_path))
+
+
+@router.post("/reports/{report_id}/convert-pdf", response_model=ReportResponse)
+async def convert_report_pdf(
+    report_id: UUID,
+    user_id: str = Depends(get_request_user_id),
+) -> ReportResponse:
+    report = get_report(report_id, user_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if not report.docx_storage_path:
+        raise HTTPException(status_code=422, detail="Render the DOCX before converting it to PDF.")
+
+    storage_root = Path(__file__).resolve().parents[2] / ".local_storage"
+    docx_path = storage_root / report.docx_storage_path
+    try:
+        pdf_path = convert_docx_to_pdf(docx_path, docx_path.parent)
+    except PdfConversionError as exc:
+        report.last_error = str(exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return set_pdf_path(report, str(pdf_path.relative_to(storage_root)))
+
+
+@router.get("/reports/{report_id}/download/{file_type}")
+async def download_report_file(
+    report_id: UUID,
+    file_type: str,
+    user_id: str = Depends(get_request_user_id),
+) -> FileResponse:
+    report = get_report(report_id, user_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if file_type not in {"docx", "pdf"}:
+        raise HTTPException(status_code=400, detail="Only DOCX and PDF downloads are supported.")
+
+    storage_path = report.docx_storage_path if file_type == "docx" else report.pdf_storage_path
+    if not storage_path:
+        raise HTTPException(status_code=404, detail=f"{file_type.upper()} file is not ready.")
+
+    storage_root = (Path(__file__).resolve().parents[2] / ".local_storage").resolve()
+    file_path = (storage_root / storage_path).resolve()
+    if storage_root not in file_path.parents or not file_path.exists():
+        raise HTTPException(status_code=404, detail="Report file not found.")
+
+    media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if file_type == "docx" else "application/pdf"
+    return FileResponse(file_path, media_type=media_type, filename=f"event-report.{file_type}")

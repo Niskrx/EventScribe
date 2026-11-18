@@ -110,3 +110,10 @@ def set_docx_path(report: LocalReport, storage_path: str) -> ReportResponse:
     report.status = "ready"
     report.last_error = None
     return report_response(report)
+
+
+def set_pdf_path(report: LocalReport, storage_path: str) -> ReportResponse:
+    report.pdf_storage_path = storage_path
+    report.status = "ready"
+    report.last_error = None
+    return report_response(report)
