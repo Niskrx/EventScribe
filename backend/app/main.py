@@ -20,8 +20,7 @@ def create_app() -> FastAPI:
         for origin in settings.frontend_origin.split(",")
         if origin.strip()
     }
-    if settings.environment == "production":
-        allowed_origins.add("https://frontend-two-olive-91.vercel.app")
+    allowed_origins.add("https://frontend-two-olive-91.vercel.app")
     app = FastAPI(
         title="EventScribe API",
         version="0.1.0",
