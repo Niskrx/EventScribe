@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str | None = None
     gemini_api_key: str | None = None
     gemini_model: str | None = None
+    gemini_api_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     max_reference_file_mb: int = 10
     max_photo_file_mb: int = 8
     max_photos_per_event: int = 20

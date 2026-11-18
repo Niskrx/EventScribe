@@ -4,8 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
-FormatSourceType = Literal["pdf", "docx", "text"]
+from app.schemas.common import FormatSourceType
+from app.schemas.format_spec import FormatSpecification
 
 
 class TextFormatRequest(BaseModel):
@@ -31,5 +31,7 @@ class FormatProfileResponse(BaseModel):
     source_type: FormatSourceType
     source_storage_path: str | None = None
     analysis_status: Literal["pending", "ready", "failed"] = "pending"
+    format_spec: FormatSpecification | None = None
+    analysis_error: str | None = None
     extracted: ExtractedFormatInput
     created_at: datetime

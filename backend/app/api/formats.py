@@ -5,8 +5,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from app.auth import get_request_user_id
 from app.config import Settings, get_settings
 from app.schemas.formats import FormatProfileResponse, TextFormatRequest
+from app.services.ai.gemini import GeminiAdapter, GeminiError
 from app.services.extraction.service import extract_reference, extract_text_description, source_type_for_upload
-from app.services.local_format_store import create_local_profile, get_local_profile
+from app.services.local_format_store import (
+    create_local_profile,
+    get_local_profile,
+    get_local_profile_record,
+    mark_local_profile_analysis,
+)
 
 router = APIRouter(prefix="/api/formats", tags=["formats"])
 
@@ -73,3 +79,23 @@ async def read_format_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Format profile not found.")
     return profile
+
+
+@router.post("/{profile_id}/analyze", response_model=FormatProfileResponse)
+async def analyze_format_profile(
+    profile_id: UUID,
+    user_id: str = Depends(get_request_user_id),
+    settings: Settings = Depends(get_settings),
+) -> FormatProfileResponse:
+    profile = get_local_profile_record(profile_id, user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Format profile not found.")
+
+    try:
+        specification = await GeminiAdapter(settings).analyze_format(profile.extracted)
+    except GeminiError as exc:
+        mark_local_profile_analysis(profile, error=exc.message)
+        status_code = 503 if exc.code in {"AI_NOT_CONFIGURED", "AI_UNAVAILABLE", "AI_QUOTA_EXCEEDED"} else 502
+        raise HTTPException(status_code=status_code, detail=exc.message) from exc
+
+    return mark_local_profile_analysis(profile, format_spec=specification)
