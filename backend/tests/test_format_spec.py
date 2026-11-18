@@ -36,7 +36,7 @@ def test_format_specification_orders_sections() -> None:
 
 
 def test_gemini_adapter_is_safe_when_not_configured() -> None:
-    adapter = GeminiAdapter(Settings())
+    adapter = GeminiAdapter(Settings(gemini_api_key=None, gemini_model=None))
     extracted = ExtractedFormatInput(source_type="text", text="Use a title page.")
 
     with pytest.raises(GeminiError, match="not configured"):
