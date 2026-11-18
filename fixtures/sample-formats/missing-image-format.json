@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "source_type": "text",
+  "document_title_rule": "Use the verified event title.",
+  "sections": [
+    {"key": "gallery", "title": "Photographs", "order": 1, "required": true, "content_type": "paragraphs", "heading_level": 1}
+  ],
+  "style": {"font_family": "Arial", "body_font_size_pt": 11},
+  "images": {"mode": "single", "columns": 1, "captions": true},
+  "tables": [],
+  "uncertainties": ["No photograph asset is supplied with this fixture; rendering must omit the missing image without failing."]
+}
