@@ -68,12 +68,14 @@ Use `frontend/.env.local.example` for browser-safe variables and `backend/.env.e
 |---|---|---|
 | Frontend | `npm run dev` | Start the Next.js development server |
 | Frontend | `npm run typecheck` | Run the TypeScript compiler without emitting files |
+| Frontend | `npm run lint` | Run ESLint checks |
 | Frontend | `npm run build` | Create a production build |
-| Frontend | `npm run verify` | Run frontend typecheck and production build |
+| Frontend | `npm run verify` | Run frontend lint, typecheck, and production build |
 | Backend | `uvicorn app.main:app --reload --port 8000` | Start the FastAPI development server |
 | Backend | `python -m compileall -q app tests` | Check Python syntax |
+| Backend | `ruff check app tests` | Run Python lint checks |
 | Backend | `pytest` | Run backend tests |
-| Backend | `python -m compileall -q app tests && pytest` | Run backend verification |
+| Backend | `python -m compileall -q app tests && ruff check app tests && pytest` | Run backend verification |
 
 Dependency strategy: frontend dependencies are pinned in `frontend/package.json` and `frontend/package-lock.json`; backend runtime and test dependencies are pinned in `backend/requirements.txt`. A generated Python environment is never committed. A release lock/export can be produced later if deployment requires one.
 

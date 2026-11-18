@@ -1,13 +1,13 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.events import router as events_router
+from app.api.formats import router as formats_router
 from app.api.health import router as health_router
 from app.api.me import router as me_router
-from app.api.formats import router as formats_router
-from app.api.events import router as events_router
 from app.api.reports import router as reports_router
 from app.config import get_settings
 from app.schemas.errors import ErrorResponse

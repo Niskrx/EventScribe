@@ -6,7 +6,6 @@ from app.main import app
 from app.schemas.reports import ReportContent
 from app.services.local_report_store import finish_report, start_report
 
-
 client = TestClient(app)
 
 

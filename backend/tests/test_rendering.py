@@ -10,7 +10,6 @@ from app.schemas.reports import ReportContent
 from app.services.local_format_store import get_local_profile_record, mark_local_profile_analysis
 from app.services.local_report_store import finish_report, start_report
 
-
 client = TestClient(app)
 
 

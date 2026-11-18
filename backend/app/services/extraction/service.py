@@ -6,7 +6,6 @@ from docx import Document
 
 from app.schemas.formats import ExtractedFormatInput, FormatSourceType
 
-
 SUPPORTED_TYPES: dict[str, FormatSourceType] = {
     "application/pdf": "pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",

@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
 router = APIRouter(prefix="/test-errors")
 
 

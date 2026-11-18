@@ -7,10 +7,8 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import app
 from app.schemas.format_spec import FormatSpecification
-from app.schemas.formats import ExtractedFormatInput
 from app.services.ai.gemini import GeminiAdapter
 from app.services.local_format_store import mark_local_profile_analysis
-
 
 client = TestClient(app)
 

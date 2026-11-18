@@ -3,9 +3,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from app.schemas.formats import ExtractedFormatInput, FormatProfileResponse, FormatSourceType
 from app.schemas.format_spec import FormatSpecification
-
+from app.schemas.formats import ExtractedFormatInput, FormatProfileResponse, FormatSourceType
 
 LOCAL_STORAGE_ROOT = Path(__file__).resolve().parents[2] / ".local_storage"
 

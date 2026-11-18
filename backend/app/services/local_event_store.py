@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 from app.schemas.events import EventResponse, PhotoResponse
 
-
 LOCAL_STORAGE_ROOT = Path(__file__).resolve().parents[2] / ".local_storage"
 
 

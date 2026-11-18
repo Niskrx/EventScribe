@@ -9,11 +9,10 @@ from app.services.local_event_store import (
     add_photo,
     create_event,
     delete_event,
-    event_response,
     delete_photo,
+    event_response,
     get_event,
     get_photo,
-    photo_response,
     reorder_photos,
     update_event,
 )

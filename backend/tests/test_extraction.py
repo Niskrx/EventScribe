@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.extraction.service import extract_docx, extract_pdf, extract_text_description
 
-
 client = TestClient(app)
 
 

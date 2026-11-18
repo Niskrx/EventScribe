@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,21 +8,19 @@ from app.auth import get_request_user_id
 from app.config import Settings, get_settings
 from app.schemas.reports import ReportContent, ReportResponse
 from app.services.ai.gemini import GeminiAdapter, GeminiError
-from pathlib import Path
-
 from app.services.local_event_store import event_response, get_event, list_event_photos
 from app.services.local_format_store import get_local_profile_record
 from app.services.local_report_store import (
+    delete_report,
     fail_report,
     finish_report,
     get_event_report,
     get_report,
     list_reports,
-    delete_report,
     report_response,
+    set_docx_path,
     set_pdf_path,
     start_report,
-    set_docx_path,
     update_report_content,
 )
 from app.services.rendering.docx_renderer import render_docx

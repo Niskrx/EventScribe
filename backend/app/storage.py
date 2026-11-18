@@ -1,6 +1,5 @@
 from pathlib import PurePosixPath
 
-
 BUCKET_NAME = "eventscribe-files"
 
 

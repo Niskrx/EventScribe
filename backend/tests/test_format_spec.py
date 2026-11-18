@@ -8,8 +8,7 @@ from app.config import Settings
 from app.main import app
 from app.schemas.format_spec import FormatSpecification
 from app.schemas.formats import ExtractedFormatInput
-from app.services.ai.gemini import GeminiAdapter, GeminiError, build_format_analysis_prompt
-
+from app.services.ai.gemini import GeminiAdapter, GeminiError
 
 client = TestClient(app)
 

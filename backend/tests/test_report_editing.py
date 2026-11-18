@@ -1,10 +1,10 @@
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.reports import ReportContent
 from app.services.local_report_store import finish_report, start_report
-from uuid import UUID, uuid4
-
 
 client = TestClient(app)
 
