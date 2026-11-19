@@ -88,7 +88,10 @@ def photo_response(photo: LocalPhoto) -> PhotoResponse:
 def create_event(user_id: str, data: dict[str, Any]) -> EventResponse:
     if enabled():
         event_id = uuid4()
-        values = {key: value.isoformat() if hasattr(value, "isoformat") else value for key, value in data.items()}
+        values = {
+            key: value.isoformat() if isinstance(value, (date, time)) else str(value) if isinstance(value, UUID) else value
+            for key, value in data.items()
+        }
         row = SupabaseRest().insert("events", {"id": str(event_id), "user_id": user_id, **values})
         return event_response(_event_from_row(row))
     event = LocalEvent(id=uuid4(), user_id=user_id, **data)
