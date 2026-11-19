@@ -20,7 +20,7 @@ export default function NewReportPage() {
             Create Event Report
           </h1>
           <p className="mt-2 text-sm text-slate-600 max-w-2xl">
-            Enter the verified event details and attach event photographs. In the next step, EventScribe will align the content to your format specification.
+            Enter verified event details, provide the department reference format, and attach event photographs. EventScribe will analyze the reference through the backend before generating your report.
           </p>
         </div>
 
@@ -36,8 +36,8 @@ export default function NewReportPage() {
             {
               step: "02",
               title: "Reference Format",
-              description: "PDF/DOCX structure or prompt guideline",
-              active: false,
+              description: "PDF/DOCX structure or text guideline",
+              active: true,
             },
             {
               step: "03",
