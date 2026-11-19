@@ -25,6 +25,7 @@ from app.services.local_report_store import (
 )
 from app.services.rendering.docx_renderer import render_docx
 from app.services.rendering.pdf_converter import PdfConversionError, convert_docx_to_pdf
+from app.services.supabase_rest import SupabaseRest, enabled
 
 router = APIRouter(prefix="/api", tags=["reports"])
 PROMPT_VERSION = "format-report-v1"
@@ -184,6 +185,11 @@ async def download_report_file(
 
     storage_root = (Path(__file__).resolve().parents[2] / ".local_storage").resolve()
     file_path = (storage_root / storage_path).resolve()
+    if storage_root not in file_path.parents:
+        raise HTTPException(status_code=404, detail="Report file not found.")
+    if enabled() and not file_path.exists():
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_bytes(SupabaseRest().download(storage_path))
     if storage_root not in file_path.parents or not file_path.exists():
         raise HTTPException(status_code=404, detail="Report file not found.")
 
