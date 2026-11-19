@@ -1,35 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
 
 export default function SignupPage() {
-  const router = useRouter();
-  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== "false" || !supabase;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (demoMode) router.replace("/dashboard");
-  }, [demoMode, router]);
-
-  if (demoMode) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-        <p className="text-sm font-medium text-slate-600">Opening the demo workspace…</p>
-      </main>
-    );
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
+
+    if (!supabase) {
+      setMessage("Supabase is not configured yet. Add the public Supabase variables first.");
+      return;
+    }
 
     if (password.length < 6) {
       setMessage("Password must be at least 6 characters long.");
@@ -41,7 +31,6 @@ export default function SignupPage() {
       return;
     }
 
-    if (!supabase) return;
     setIsSubmitting(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setIsSubmitting(false);
