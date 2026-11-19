@@ -22,6 +22,8 @@ This repository contains deployment configuration, but the external deployment i
 9. Confirm CORS, authentication callbacks, signed downloads, and PDF conversion in the deployed environment.
 10. Never put `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` in frontend variables, Git, screenshots, or logs.
 
+For the presentation/demo deployment, the Render blueprint enables `ALLOW_GUEST_ACCESS`. This creates a backend workspace session when Supabase public variables are unavailable; it does not create fake reports or bypass the backend APIs. Disable it for a protected production deployment after adding Supabase authentication variables.
+
 ## Production smoke test
 
 ```bash

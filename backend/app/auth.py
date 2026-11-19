@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import secrets
+from uuid import uuid4
 
 import httpx
 from fastapi import Depends, Header, HTTPException, status
@@ -10,6 +12,21 @@ from app.config import Settings, get_settings
 class CurrentUser:
     id: str
     email: str | None = None
+
+
+_guest_sessions: dict[str, str] = {}
+
+
+def create_guest_session() -> str:
+    token = secrets.token_urlsafe(32)
+    _guest_sessions[token] = f"guest-{uuid4()}"
+    return token
+
+
+def get_guest_user_id(token: str | None) -> str | None:
+    if not token:
+        return None
+    return _guest_sessions.get(token)
 
 
 async def get_current_user(
@@ -49,12 +66,18 @@ async def get_current_user(
 async def get_request_user_id(
     authorization: str | None = Header(default=None),
     x_eventscribe_user: str | None = Header(default=None),
+    x_eventscribe_guest: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
 ) -> str:
-    """Use Supabase identity in configured environments and a clearly local-only user otherwise."""
+    """Use Supabase identity, or an explicitly enabled backend guest session."""
     if authorization:
         user = await get_current_user(authorization=authorization, settings=settings)
         return user.id
+    if settings.allow_guest_access:
+        guest_user_id = get_guest_user_id(x_eventscribe_guest)
+        if guest_user_id:
+            return guest_user_id
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="A valid guest workspace session is required.")
     if settings.environment == "development":
         return x_eventscribe_user or "local-dev-user"
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required.")

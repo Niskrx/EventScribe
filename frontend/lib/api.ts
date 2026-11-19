@@ -1,6 +1,7 @@
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
 import { supabase } from "@/lib/supabase";
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const GUEST_SESSION_KEY = "eventscribe-guest-session-token";
 
 export type EventDraft = {
   title: string;
@@ -51,19 +52,44 @@ export type FormatProfileResponse = {
 };
 
 async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-  if (!supabase) {
-    throw new Error("Supabase is not configured. Add the public Supabase variables and sign in first.");
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error(error.message);
-  if (!data.session?.access_token) {
-    throw new Error("Your session has expired. Please sign in again.");
-  }
-
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${data.session.access_token}`);
-  return fetch(input, { ...init, headers });
+  if (supabase) {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw new Error(error.message);
+    if (!data.session?.access_token) {
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+    headers.set("Authorization", `Bearer ${data.session.access_token}`);
+    return fetch(input, { ...init, headers });
+  }
+
+  if (typeof window === "undefined") {
+    throw new Error("A browser workspace is required for guest access.");
+  }
+
+  let guestToken = window.sessionStorage.getItem(GUEST_SESSION_KEY);
+  if (!guestToken) {
+    guestToken = await createGuestSession();
+    window.sessionStorage.setItem(GUEST_SESSION_KEY, guestToken);
+  }
+  headers.set("X-Eventscribe-Guest", guestToken);
+  let response = await fetch(input, { ...init, headers });
+
+  if (response.status === 401) {
+    window.sessionStorage.removeItem(GUEST_SESSION_KEY);
+    guestToken = await createGuestSession();
+    window.sessionStorage.setItem(GUEST_SESSION_KEY, guestToken);
+    headers.set("X-Eventscribe-Guest", guestToken);
+    response = await fetch(input, { ...init, headers });
+  }
+
+  return response;
+}
+
+async function createGuestSession(): Promise<string> {
+  const response = await fetch(`${apiBaseUrl}/api/guest/session`, { method: "POST" });
+  const payload = await parseResponse<{ token: string }>(response);
+  return payload.token;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {

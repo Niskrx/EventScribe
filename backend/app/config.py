@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
     supabase_service_role_key: str | None = None
+    allow_guest_access: bool = False
     gemini_api_key: str | None = None
     gemini_model: str | None = None
     gemini_api_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
@@ -34,6 +35,8 @@ def get_settings() -> Settings:
 
     if not settings.supabase_url or not settings.supabase_anon_key:
         warnings.append("Supabase integration is not configured; authentication and persistence are disabled.")
+    if settings.allow_guest_access:
+        warnings.append("Guest workspace access is enabled; use Supabase authentication for protected deployments.")
     if not settings.gemini_api_key or not settings.gemini_model:
         warnings.append("Gemini integration is not configured; AI analysis and generation are disabled.")
 
