@@ -19,6 +19,9 @@ STORAGE_ROOT = Path(__file__).resolve().parents[1] / ".local_storage"
 PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
+WEBP_2X2 = base64.b64decode(
+    "UklGRjgAAABXRUJQVlA4ICwAAADQAQCdASoCAAIAAUAmJaACdLoB+AADsAD+9Ykf/lnz+Gzj3/8guWF1xGAAAA=="
+)
 
 
 def auth(user: str) -> dict[str, str]:
@@ -103,10 +106,10 @@ def create_finished_report(user: str, event_id: str):
     return report
 
 
-def upload_photo(user: str, event_id: str, caption: str) -> dict:
+def upload_photo(user: str, event_id: str, caption: str, *, filename: str = "qa-photo.png", content: bytes = PNG_1X1, mime_type: str = "image/png") -> dict:
     response = client.post(
         f"/api/events/{event_id}/photos",
-        files={"file": ("qa-photo.png", PNG_1X1, "image/png")},
+        files={"file": (filename, content, mime_type)},
         data={"caption": caption},
         headers=auth(user),
     )
@@ -170,6 +173,19 @@ def test_docx_download_has_expected_content_type_filename_and_body() -> None:
     assert "event-report.docx" in response.headers["content-disposition"]
     assert response.content.startswith(b"PK")
     assert len(response.content) > 0
+
+
+def test_webp_photo_is_normalized_for_docx_rendering() -> None:
+    user = "qa-rendering-webp"
+    profile = create_analyzed_profile(user)
+    event_id = create_event(user, profile.id)
+    report = create_finished_report(user, event_id)
+    upload_photo(user, event_id, "WebP photograph", filename="qa-photo.webp", content=WEBP_2X2, mime_type="image/webp")
+
+    rendered = render_report(user, report.id)
+    document = Document(STORAGE_ROOT / rendered["docx_storage_path"])
+
+    assert len(document.inline_shapes) == 1
 
 
 def test_missing_photo_file_is_omitted_without_failing_render() -> None:

@@ -1,14 +1,20 @@
+import logging
+from io import BytesIO
 from pathlib import Path
 from typing import Iterable
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.image.exceptions import UnrecognizedImageError
 from docx.shared import Cm, Inches, Mm, Pt
+from PIL import Image, ImageOps
 
 from app.schemas.format_spec import FormatSpecification
 from app.schemas.reports import ReportBlock, ReportContent
 from app.services.local_event_store import LocalPhoto
+
+logger = logging.getLogger(__name__)
 
 
 def _alignment(value: str) -> int:
@@ -69,9 +75,26 @@ def _add_photo_grid(document: Document, photos: Iterable[LocalPhoto], columns: i
         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
         image_path = root / photo.storage_path
         if image_path.exists():
-            paragraph = cell.paragraphs[0]
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            paragraph.add_run().add_picture(str(image_path), width=Inches(2.6))
+            try:
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                image_source: str | BytesIO = str(image_path)
+                # python-docx does not understand WebP even though the upload API
+                # accepts it. Normalize WebP to PNG before inserting it into DOCX.
+                if photo.mime_type == "image/webp" or image_path.suffix.lower() == ".webp":
+                    with Image.open(image_path) as image:
+                        normalized = ImageOps.exif_transpose(image)
+                        if normalized.mode not in {"RGB", "RGBA"}:
+                            normalized = normalized.convert("RGBA" if "A" in normalized.getbands() else "RGB")
+                        image_source = BytesIO()
+                        normalized.save(image_source, format="PNG")
+                        image_source.seek(0)
+                paragraph.add_run().add_picture(image_source, width=Inches(2.6))
+            except (OSError, UnrecognizedImageError, ValueError) as exc:
+                # A corrupt or partially uploaded photo must not make the whole
+                # academic report unusable. The text report still renders and the
+                # missing image is visible to the reviewer in the source event.
+                logger.warning("Skipping photo %s during DOCX rendering: %s", photo.original_filename, exc)
         if captions and photo.caption:
             caption = cell.add_paragraph(photo.caption)
             caption.alignment = WD_ALIGN_PARAGRAPH.CENTER

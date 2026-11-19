@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -29,6 +30,7 @@ from app.services.supabase_rest import SupabaseRest, enabled
 
 router = APIRouter(prefix="/api", tags=["reports"])
 PROMPT_VERSION = "format-report-v1"
+logger = logging.getLogger(__name__)
 
 
 @router.post("/events/{event_id}/generate", response_model=ReportResponse)
@@ -140,6 +142,7 @@ async def render_report_docx(
         output_path.write_bytes(data)
     except Exception as exc:
         report.last_error = "The DOCX report could not be rendered."
+        logger.exception("DOCX rendering failed for report %s", report_id)
         raise HTTPException(status_code=500, detail=report.last_error) from exc
 
     return set_docx_path(report, str(relative_path))
