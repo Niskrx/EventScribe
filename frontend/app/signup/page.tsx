@@ -121,14 +121,7 @@ export default function SignupPage() {
           ) : null}
         </form>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-          <Link
-            href="/dashboard"
-            className="block w-full rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5 text-center text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            Skip to Local Demo Workspace →
-          </Link>
-
+        <div className="mt-6 pt-6 border-t border-slate-100">
           <p className="text-center text-xs text-slate-500">
             Already have an account?{" "}
             <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-800">

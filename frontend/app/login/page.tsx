@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -16,14 +18,18 @@ export default function LoginPage() {
     setMessage(null);
 
     if (!supabase) {
-      setMessage("Supabase is not configured yet. You can use the local demo workspace below.");
+      setMessage("Authentication is not configured. Please ask the project owner to add the Supabase environment variables.");
       return;
     }
 
     setIsSubmitting(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setIsSubmitting(false);
-    setMessage(error ? error.message : "Signed in successfully. Redirecting to dashboard...");
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    router.replace("/dashboard");
   }
 
   return (
@@ -90,14 +96,7 @@ export default function LoginPage() {
           ) : null}
         </form>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-          <Link
-            href="/dashboard"
-            className="block w-full rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5 text-center text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            Continue with Local Demo Workspace →
-          </Link>
-
+        <div className="mt-6 pt-6 border-t border-slate-100">
           <p className="text-center text-xs text-slate-500">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-800">

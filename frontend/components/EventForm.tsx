@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useState } from "react";
 
-import { createEvent, EventDraft, uploadEventPhoto } from "@/lib/api";
+import {
+  analyzeFormat,
+  createEvent,
+  createFileFormat,
+  createTextFormat,
+  EventDraft,
+  generateReport,
+  uploadEventPhoto,
+} from "@/lib/api";
 
 const initialForm: EventDraft = {
   title: "",
@@ -23,7 +31,7 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 type ValidationErrors = Partial<Record<keyof EventDraft, string>>;
 
 type SubmitFeedback =
-  | { type: "success"; message: string; details?: string; eventId?: string }
+  | { type: "success"; message: string; details?: string; eventId?: string; reportId?: string }
   | { type: "error"; message: string }
   | null;
 
@@ -35,6 +43,10 @@ function formatFileSize(bytes: number): string {
 
 export function EventForm() {
   const [form, setForm] = useState<EventDraft>(initialForm);
+  const [formatName, setFormatName] = useState("");
+  const [formatDescription, setFormatDescription] = useState("");
+  const [formatFile, setFormatFile] = useState<File | null>(null);
+  const [formatError, setFormatError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoWarnings, setPhotoWarnings] = useState<string[]>([]);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -97,6 +109,20 @@ export function EventForm() {
     setPhotoWarnings([]);
   }
 
+  function handleFormatFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.target.files?.[0] ?? null;
+    setFormatFile(selectedFile);
+    setFormatDescription("");
+    setFormatError(null);
+    event.target.value = "";
+  }
+
+  function handleFormatDescriptionChange(value: string) {
+    setFormatDescription(value);
+    if (value.trim()) setFormatFile(null);
+    setFormatError(null);
+  }
+
   function validateForm(): ValidationErrors {
     const errs: ValidationErrors = {};
 
@@ -130,6 +156,20 @@ export function EventForm() {
     return errs;
   }
 
+  function validateReferenceFormat(): boolean {
+    if (!formatFile && !formatDescription.trim()) {
+      setFormatError("Upload a PDF/DOCX reference or describe the required format.");
+      document.getElementById("field-reference-format")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    if (!formatName.trim()) {
+      setFormatError("A name is required for the reference format.");
+      document.getElementById("field-format-name")?.focus();
+      return false;
+    }
+    return true;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) return;
@@ -148,10 +188,20 @@ export function EventForm() {
       return;
     }
 
+    if (!validateReferenceFormat()) return;
+
     setIsSubmitting(true);
     setUploadProgress(photos.length > 0 ? { current: 0, total: photos.length } : null);
 
     try {
+      const formatProfile = formatFile
+        ? await createFileFormat(formatName.trim(), formatFile)
+        : await createTextFormat(formatName.trim(), formatDescription.trim());
+      const analyzedFormat = await analyzeFormat(formatProfile.id);
+      if (analyzedFormat.analysis_status !== "ready") {
+        throw new Error(analyzedFormat.analysis_error ?? "The reference format could not be analyzed.");
+      }
+
       const payload: EventDraft = {
         title: form.title.trim(),
         event_date: form.event_date.trim(),
@@ -163,6 +213,7 @@ export function EventForm() {
         activities: form.activities.trim(),
         outcomes: form.outcomes.trim(),
         additional_facts: form.additional_facts?.trim() || undefined,
+        format_profile_id: analyzedFormat.id,
       };
 
       const created = await createEvent(payload);
@@ -172,15 +223,22 @@ export function EventForm() {
         await uploadEventPhoto(created.id, photos[i]);
       }
 
+      const report = await generateReport(created.id);
+
       setFeedback({
         type: "success",
-        message: "Event draft successfully saved!",
+        message: "Report generated successfully!",
         details: photos.length > 0
-          ? `${photos.length} photograph${photos.length === 1 ? "" : "s"} attached to this draft.`
-          : "Saved without photographs.",
+          ? `${photos.length} photograph${photos.length === 1 ? "" : "s"} attached. Review the generated report before exporting.`
+          : "Review the generated report before exporting.",
         eventId: created.id,
+        reportId: report.id,
       });
       setForm(initialForm);
+      setFormatName("");
+      setFormatDescription("");
+      setFormatFile(null);
+      setFormatError(null);
       setPhotos([]);
       setPhotoWarnings([]);
       setErrors({});
@@ -208,6 +266,14 @@ export function EventForm() {
               <p className="font-bold text-base text-emerald-900">{feedback.message}</p>
               {feedback.details ? <p className="mt-1 text-xs text-emerald-700">{feedback.details}</p> : null}
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold">
+                {feedback.reportId ? (
+                  <Link
+                    href={`/reports/${feedback.reportId}/edit`}
+                    className="rounded-lg bg-indigo-700 px-4 py-2 text-white shadow-xs hover:bg-indigo-800 transition-colors"
+                  >
+                    Review & Export
+                  </Link>
+                ) : null}
                 <Link
                   href="/dashboard"
                   className="rounded-lg bg-emerald-700 px-4 py-2 text-white shadow-xs hover:bg-emerald-800 transition-colors"
@@ -386,11 +452,72 @@ export function EventForm() {
       </div>
 
       {/* Section 3: Photograph Upload Zone */}
-      <div className="space-y-4 pt-2">
+      <div id="field-reference-format" className="space-y-4 pt-2">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
               3
+            </span>
+            <h2 className="text-base font-bold text-slate-900">Reference Format</h2>
+          </div>
+          <span className="text-xs font-medium text-slate-500">Required for generation</span>
+        </div>
+
+        <p className="text-sm leading-relaxed text-slate-600">
+          Give EventScribe the format your department expects. Upload a PDF/DOCX reference, or describe the format in text. The backend will extract and analyze it before generating the report.
+        </p>
+
+        <Field
+          id="field-format-name"
+          label="Format Name"
+          placeholder="e.g. Annual Department Event Report Format"
+          value={formatName}
+          required
+          onChange={(value) => {
+            setFormatName(value);
+            setFormatError(null);
+          }}
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="group relative flex min-h-36 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-5 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors cursor-pointer">
+            <span className="text-sm font-semibold text-slate-800">Upload reference file</span>
+            <span className="mt-1 text-xs text-slate-500">PDF or DOCX</span>
+            <input
+              type="file"
+              accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+              disabled={isSubmitting}
+              onChange={handleFormatFileSelection}
+              className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            />
+            {formatFile ? <span className="mt-3 max-w-full truncate text-xs font-semibold text-indigo-700">{formatFile.name}</span> : null}
+          </label>
+
+          <div>
+            <label htmlFor="field-reference-description" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              Or describe the format
+            </label>
+            <textarea
+              id="field-reference-description"
+              value={formatDescription}
+              onChange={(event) => handleFormatDescriptionChange(event.target.value)}
+              rows={5}
+              disabled={isSubmitting}
+              placeholder="Describe required headings, order, tone, page layout, signature blocks, and any mandatory sections..."
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 transition-all disabled:bg-slate-50"
+            />
+          </div>
+        </div>
+
+        {formatError ? <p className="text-xs font-semibold text-rose-600" role="alert">{formatError}</p> : null}
+      </div>
+
+      {/* Section 4: Photograph Upload Zone */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+              4
             </span>
             <h2 className="text-base font-bold text-slate-900">Photographic Evidence</h2>
           </div>
@@ -496,7 +623,7 @@ export function EventForm() {
       {/* Submission Bar */}
       <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-xs text-slate-500">
-          Saved drafts can be paired with any format profile in the next step.
+          The reference will be analyzed by the backend before your report is generated.
         </p>
 
         <button

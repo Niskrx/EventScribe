@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-import { getReport, ReportContent, ReportResponse, updateReportContent } from "@/lib/api";
+import {
+  convertReportPdf,
+  downloadReportFile,
+  getReport,
+  renderReport,
+  ReportContent,
+  ReportResponse,
+  updateReportContent,
+} from "@/lib/api";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 
@@ -11,6 +19,7 @@ export function ReportEditor({ reportId }: { reportId: string }) {
   const [content, setContent] = useState<ReportContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,8 +52,8 @@ export function ReportEditor({ reportId }: { reportId: string }) {
     });
   }
 
-  async function save() {
-    if (!content) return;
+  async function save(): Promise<ReportResponse | null> {
+    if (!content) return null;
     setIsSaving(true);
     setMessage(null);
     try {
@@ -52,10 +61,66 @@ export function ReportEditor({ reportId }: { reportId: string }) {
       setReport(saved);
       setContent(saved.content_json);
       setMessage(`Changes saved successfully (Version ${saved.content_version}).`);
+      return saved;
     } catch (saveError: unknown) {
       setMessage(saveError instanceof Error ? saveError.message : "The report could not be saved.");
+      return null;
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function prepareDocx() {
+    if (isExporting) return;
+    setIsExporting(true);
+    setMessage("Saving edits and rendering the DOCX…");
+    try {
+      const saved = await save();
+      if (!saved) return;
+      const rendered = await renderReport(reportId);
+      setReport(rendered);
+      setMessage("DOCX is ready. You can download it or convert it to PDF.");
+    } catch (renderError: unknown) {
+      setMessage(renderError instanceof Error ? renderError.message : "The DOCX could not be rendered.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function preparePdf() {
+    if (isExporting) return;
+    setIsExporting(true);
+    setMessage("Converting the rendered DOCX to PDF…");
+    try {
+      const converted = await convertReportPdf(reportId);
+      setReport(converted);
+      setMessage("PDF is ready to download.");
+    } catch (convertError: unknown) {
+      setMessage(convertError instanceof Error ? convertError.message : "The PDF could not be created.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function download(fileType: "docx" | "pdf") {
+    if (isExporting) return;
+    setIsExporting(true);
+    setMessage(`Preparing ${fileType.toUpperCase()} download…`);
+    try {
+      const blob = await downloadReportFile(reportId, fileType);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `event-report.${fileType}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setMessage(`${fileType.toUpperCase()} downloaded successfully.`);
+    } catch (downloadError: unknown) {
+      setMessage(downloadError instanceof Error ? downloadError.message : "The file could not be downloaded.");
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -116,7 +181,8 @@ export function ReportEditor({ reportId }: { reportId: string }) {
         ))}
 
         {/* Action Bar */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={save}
@@ -140,6 +206,43 @@ export function ReportEditor({ reportId }: { reportId: string }) {
               </>
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={prepareDocx}
+            disabled={isSaving || isExporting}
+            className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Render DOCX
+          </button>
+
+          <button
+            type="button"
+            onClick={preparePdf}
+            disabled={isSaving || isExporting || !report.docx_storage_path}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Convert to PDF
+          </button>
+
+          <button
+            type="button"
+            onClick={() => download("docx")}
+            disabled={isSaving || isExporting || !report.docx_storage_path}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Download DOCX
+          </button>
+
+          <button
+            type="button"
+            onClick={() => download("pdf")}
+            disabled={isSaving || isExporting || !report.pdf_storage_path}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Download PDF
+          </button>
+          </div>
 
           {message ? (
             <p className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800" role="status">
