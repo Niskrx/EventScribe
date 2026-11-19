@@ -35,6 +35,13 @@ def extract_text_description(description: str) -> ExtractedFormatInput:
 def extract_pdf(data: bytes, filename: str | None = None) -> ExtractedFormatInput:
     with fitz.open(stream=data, filetype="pdf") as document:
         pages = [page.get_text("text").strip() for page in document]
+        first_page = document[0] if document.page_count else None
+        page_size = {}
+        if first_page is not None:
+            page_size = {
+                "page_width_mm": round(first_page.rect.width * 25.4 / 72, 1),
+                "page_height_mm": round(first_page.rect.height * 25.4 / 72, 1),
+            }
         text = "\n\n".join(page for page in pages if page)
         return ExtractedFormatInput(
             source_type="pdf",
@@ -42,7 +49,7 @@ def extract_pdf(data: bytes, filename: str | None = None) -> ExtractedFormatInpu
             text=text,
             page_count=document.page_count,
             paragraphs=[paragraph.strip() for paragraph in text.split("\n\n") if paragraph.strip()],
-            metadata=document.metadata or {},
+            metadata={**(document.metadata or {}), **page_size},
         )
 
 
@@ -61,6 +68,13 @@ def extract_docx(data: bytes, filename: str | None = None) -> ExtractedFormatInp
         for paragraph in document.paragraphs
         if paragraph.text.strip() and paragraph.style.name.lower().startswith("heading")
     ]
+    section = document.sections[0]
+    metadata = {
+        "paragraph_count": len(paragraphs),
+        "table_row_count": len(table_lines),
+        "page_width_mm": round(section.page_width.inches * 25.4, 1),
+        "page_height_mm": round(section.page_height.inches * 25.4, 1),
+    }
     return ExtractedFormatInput(
         source_type="docx",
         source_filename=filename,
@@ -68,7 +82,7 @@ def extract_docx(data: bytes, filename: str | None = None) -> ExtractedFormatInp
         headings=headings,
         paragraphs=extracted_parts,
         table_count=len(document.tables),
-        metadata={"paragraph_count": len(paragraphs), "table_row_count": len(table_lines)},
+        metadata=metadata,
     )
 
 

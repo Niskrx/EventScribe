@@ -19,6 +19,8 @@ class StyleSpecification(BaseModel):
     body_alignment: Literal["left", "center", "right", "justify"] = "justify"
     line_spacing: float = Field(default=1.15, gt=0, le=4)
     margins: PageMargins = Field(default_factory=PageMargins)
+    page_width_mm: float = Field(default=210, gt=50, le=1000)
+    page_height_mm: float = Field(default=297, gt=50, le=1500)
 
 
 class SectionSpecification(BaseModel):

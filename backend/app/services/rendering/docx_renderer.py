@@ -4,7 +4,7 @@ from typing import Iterable
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Cm, Inches, Pt
+from docx.shared import Cm, Inches, Mm, Pt
 
 from app.schemas.format_spec import FormatSpecification
 from app.schemas.reports import ReportBlock, ReportContent
@@ -27,6 +27,8 @@ def _configure_document(document: Document, specification: FormatSpecification) 
     section.right_margin = Cm(margins.right_cm)
     section.bottom_margin = Cm(margins.bottom_cm)
     section.left_margin = Cm(margins.left_cm)
+    section.page_width = Mm(specification.style.page_width_mm)
+    section.page_height = Mm(specification.style.page_height_mm)
 
     normal = document.styles["Normal"]
     normal.font.name = specification.style.font_family
