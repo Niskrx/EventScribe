@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.main import app
 from app.schemas.format_spec import FormatSpecification
 from app.schemas.formats import ExtractedFormatInput
@@ -65,7 +65,8 @@ def test_gemini_adapter_validates_structured_response() -> None:
     assert result.sections[0].key == "introduction"
 
 
-def test_analyze_endpoint_reports_missing_ai_configuration() -> None:
+def test_analyze_endpoint_reports_missing_ai_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(app.dependency_overrides, get_settings, lambda: Settings(gemini_api_key=None, gemini_model=None))
     create_response = client.post(
         "/api/formats/text",
         json={"name": "Needs analysis", "description": "Use a title page."},

@@ -62,10 +62,15 @@ class GeminiAdapter:
         except ValueError as exc:
             raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned JSON that did not match the report schema.") from exc
 
-        expected_keys = {section.key for section in specification.sections}
-        actual_keys = {section.key for section in content.sections}
-        if expected_keys != actual_keys:
+        ordered_sections = specification.ordered_sections()
+        expected_keys = [section.key for section in ordered_sections]
+        actual_keys = [section.key for section in content.sections]
+        if len(actual_keys) != len(expected_keys) or set(expected_keys) != set(actual_keys):
             raise GeminiError("INVALID_MODEL_OUTPUT", "Gemini returned report sections that do not match the approved format.")
+        generated_sections = {section.key: section for section in content.sections}
+        content.sections = [generated_sections[section.key] for section in ordered_sections]
+        for generated, required in zip(content.sections, ordered_sections, strict=True):
+            generated.title = required.title
         return content
 
     async def generate_json(self, prompt: str, schema: dict[str, Any]) -> str:
@@ -99,8 +104,27 @@ class GeminiAdapter:
             raise GeminiError("AI_QUOTA_EXCEEDED", "Gemini free-tier quota or rate limit was reached.", retryable=True)
         if response.status_code in {500, 502, 503, 504}:
             raise GeminiError("AI_UNAVAILABLE", "Gemini is temporarily unavailable.", retryable=True)
+        if response.status_code == 400:
+            # Some Gemini models reject Pydantic's JSON Schema dialect even though
+            # they support JSON MIME output. Retry without responseJsonSchema and
+            # validate the returned JSON against our Pydantic model locally.
+            fallback_payload = {
+                "contents": payload["contents"],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "responseMimeType": "application/json",
+                },
+            }
+            try:
+                if self.client is None:
+                    async with httpx.AsyncClient(timeout=45) as client:
+                        response = await client.post(endpoint, headers=headers, json=fallback_payload)
+                else:
+                    response = await self.client.post(endpoint, headers=headers, json=fallback_payload)
+            except httpx.HTTPError as exc:
+                raise GeminiError("AI_UNAVAILABLE", "Gemini could not be reached.", retryable=True) from exc
         if response.status_code >= 400:
-            raise GeminiError("AI_REQUEST_FAILED", "Gemini rejected the format-analysis request.")
+            raise GeminiError("AI_REQUEST_FAILED", "Gemini rejected the structured generation request.")
 
         try:
             payload = response.json()
@@ -115,7 +139,7 @@ def build_report_content_prompt(event_facts: dict, specification: FormatSpecific
         "Do not invent names, dates, attendance numbers, quotes, activities, awards, outcomes, or "
         "other facts. If a requested detail is absent, leave it out and add a concise review note "
         "or include it in missing_facts. Return only JSON matching the report content schema. "
-        "Use the exact section keys and titles from the approved format specification.\n\n"
+        "Use the exact section keys, titles, and order from the approved format specification.\n\n"
         f"Verified event facts:\n{json.dumps(event_facts, ensure_ascii=False, default=str)}\n\n"
         f"Approved format specification:\n{specification.model_dump_json()}"
     )

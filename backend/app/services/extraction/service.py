@@ -49,6 +49,13 @@ def extract_pdf(data: bytes, filename: str | None = None) -> ExtractedFormatInpu
 def extract_docx(data: bytes, filename: str | None = None) -> ExtractedFormatInput:
     document = Document(BytesIO(data))
     paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    table_lines = [
+        " | ".join(cell.text.strip() for cell in row.cells).strip(" |")
+        for table in document.tables
+        for row in table.rows
+        if any(cell.text.strip() for cell in row.cells)
+    ]
+    extracted_parts = paragraphs + [line for line in table_lines if line]
     headings = [
         paragraph.text.strip()
         for paragraph in document.paragraphs
@@ -57,11 +64,11 @@ def extract_docx(data: bytes, filename: str | None = None) -> ExtractedFormatInp
     return ExtractedFormatInput(
         source_type="docx",
         source_filename=filename,
-        text="\n\n".join(paragraphs),
+        text="\n\n".join(extracted_parts),
         headings=headings,
-        paragraphs=paragraphs,
+        paragraphs=extracted_parts,
         table_count=len(document.tables),
-        metadata={"paragraph_count": len(paragraphs)},
+        metadata={"paragraph_count": len(paragraphs), "table_row_count": len(table_lines)},
     )
 
 

@@ -14,6 +14,7 @@ import {
   isPresentationMode,
   uploadEventPhoto,
 } from "@/lib/api";
+import { analyzeReferenceFile, analyzeTextFormat, type PresentationFormat } from "@/lib/presentation-format";
 
 const initialForm: EventDraft = {
   title: "",
@@ -50,12 +51,33 @@ export function EventForm() {
   const [formatDescription, setFormatDescription] = useState("");
   const [formatFile, setFormatFile] = useState<File | null>(null);
   const [formatError, setFormatError] = useState<string | null>(null);
+  const [formatPreview, setFormatPreview] = useState<PresentationFormat | null>(null);
+  const [formatAnalyzing, setFormatAnalyzing] = useState(false);
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [photoWarnings, setPhotoWarnings] = useState<string[]>([]);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [feedback, setFeedback] = useState<SubmitFeedback>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (!isPresentationMode) return;
+    let cancelled = false;
+    if (formatFile) {
+      setFormatPreview(null);
+      setFormatAnalyzing(true);
+      analyzeReferenceFile(formatFile).then((format) => {
+        if (!cancelled) { setFormatPreview(format); setFormatError(null); }
+      }).catch((error: unknown) => {
+        if (!cancelled) setFormatError(error instanceof Error ? error.message : "The reference could not be analyzed.");
+      }).finally(() => { if (!cancelled) setFormatAnalyzing(false); });
+    } else {
+      setFormatAnalyzing(false);
+      try { setFormatPreview(formatDescription.trim() ? analyzeTextFormat(formatDescription) : null); }
+      catch { setFormatPreview(null); }
+    }
+    return () => { cancelled = true; };
+  }, [formatFile, formatDescription]);
 
   function updateField(field: keyof EventDraft, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -260,6 +282,7 @@ export function EventForm() {
       setFormatName("");
       setFormatDescription("");
       setFormatFile(null);
+      setFormatPreview(null);
       setFormatError(null);
       setPhotos([]);
       setPhotoWarnings([]);
@@ -473,7 +496,7 @@ export function EventForm() {
         </div>
       </div>
 
-      {/* Section 3: Photograph Upload Zone */}
+      {/* Section 3: Reference format */}
       <div id="field-reference-format" className="space-y-4 pt-2">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -487,7 +510,7 @@ export function EventForm() {
 
         <p className="text-sm leading-relaxed text-slate-600">
           {isPresentationMode
-            ? "Upload a PDF/DOCX reference or describe the required format. This presentation preview records your choice; automatic format analysis is available after the backend is configured."
+            ? "Upload a PDF/DOCX reference or list the required headings. This preview reads the reference and uses its detected section order and available layout details in the report. Review the detected structure before submitting."
             : "Give EventScribe the format your department expects. Upload a PDF/DOCX reference, or describe the format in text. The backend will extract and analyze it before generating the report."}
         </p>
 
@@ -527,12 +550,23 @@ export function EventForm() {
               onChange={(event) => handleFormatDescriptionChange(event.target.value)}
               rows={5}
               disabled={isSubmitting}
-              placeholder="Describe required headings, order, tone, page layout, signature blocks, and any mandatory sections..."
+              placeholder="List headings in order, for example: Sections: Introduction, Objectives, Activities, Outcomes, Photographs"
               className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 transition-all disabled:bg-slate-50"
             />
           </div>
         </div>
 
+        {formatAnalyzing ? <p className="text-xs font-semibold text-indigo-700" role="status">Reading the reference format…</p> : null}
+        {formatPreview ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 text-sm text-slate-800" role="status">
+            <p className="font-semibold">Detected format: {formatPreview.sections.length} sections in document order</p>
+            <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
+              {formatPreview.sections.map((section) => <li key={section.key}>{section.title}</li>)}
+            </ol>
+            <p className="mt-2 text-xs text-slate-600">{formatPreview.style.font_family}, {formatPreview.style.body_font_size_pt} pt body text · {formatPreview.style.page_width_mm} × {formatPreview.style.page_height_mm} mm page</p>
+            {formatPreview.uncertainties.map((warning) => <p key={warning} className="mt-1 text-xs text-amber-800">{warning}</p>)}
+          </div>
+        ) : null}
         {formatError ? <p className="text-xs font-semibold text-rose-600" role="alert">{formatError}</p> : null}
       </div>
 

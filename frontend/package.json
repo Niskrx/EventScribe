@@ -8,13 +8,17 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:format": "node --experimental-strip-types --test tests/presentation-format.test.mjs",
     "verify": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
     "docx": "^9.16.0",
+    "fast-xml-parser": "^5.12.1",
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.2",
     "next": "15.5.29",
+    "pdfjs-dist": "6.5.438",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

@@ -107,7 +107,7 @@ The backend health check is accessible at `http://localhost:8000/api/health`.
 
 Follow these steps to test or demonstrate the complete application workflow:
 
-When Supabase is not configured, the frontend opens a **Presentation Preview** without sign-in. In this mode, event facts and reports are saved in this browser, photographs are stored in browser photo storage, and DOCX/PDF exports include those photographs. The preview uses the entered facts to build the report; AI generation and automatic reference-format analysis require the configured backend. Keep the same browser for the demonstration, and attach photos when creating a new report because earlier preview reports did not retain uploads.
+When Supabase is not configured, the frontend opens a **Presentation Preview** without sign-in. In this mode, event facts and reports are saved in this browser, photographs are stored in browser photo storage, and DOCX/PDF exports include those photographs. A selectable-text PDF/DOCX reference or an explicit list of headings is analyzed in the browser: the detected headings, order, page size, and available typography drive the report and exports. This is structural matching, not AI generation or pixel-perfect copying of every template detail. Sections without matching verified event facts are flagged for manual review. Scanned PDFs without selectable text require a written heading list. Keep the same browser for the demonstration, and attach photos when creating a new report because earlier preview reports did not retain uploads.
 
 ### Step 1: Authentication
 1. Navigate to `http://localhost:3000/login` (or `/signup` to register).
@@ -132,9 +132,9 @@ When Supabase is not configured, the frontend opens a **Presentation Preview** w
 5. Click **"Save event draft"**. While processing, the button disables and displays live upload progress.
 
 ### Step 3: Choose reference format & generate report
-1. Upload a sample reference `.pdf` or `.docx` file (or type a natural language style description).
-2. The backend extracts structural signals and Gemini produces a validated `FormatSpecification`.
-3. Click **"Generate Report"**. Gemini creates structured academic prose matching the exact sections of your format specification using only verified input facts.
+1. Upload a reference `.pdf` or `.docx` file, or list the required headings in order in the text field.
+2. Check the detected section list before submitting. In Presentation Preview, the browser extracts structure and uses the entered event facts. With the configured backend, Gemini produces a validated `FormatSpecification` and fact-grounded prose.
+3. Save the event draft, then open **Review & Export**. Fill any sections flagged as requiring facts before downloading.
 
 ### Step 4: Review, edit & export
 1. Review generated sections and the photo gallery in the interactive editor at `/reports/[reportId]/edit`.

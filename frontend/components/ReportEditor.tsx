@@ -7,13 +7,16 @@ import {
   convertReportPdf,
   downloadReportFile,
   getEventPhotos,
+  getPresentationFormatForReport,
   getReport,
+  isPresentationMode,
   renderReport,
   ReportContent,
   ReportResponse,
   updateReportContent,
 } from "@/lib/api";
 import type { ReportPhoto } from "@/lib/presentation-photos";
+import type { PresentationFormat } from "@/lib/presentation-format";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 
@@ -25,6 +28,7 @@ export function ReportEditor({ reportId }: { reportId: string }) {
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [photoPreviews, setPhotoPreviews] = useState<Array<ReportPhoto & { url: string }>>([]);
+  const [format, setFormat] = useState<PresentationFormat | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +38,7 @@ export function ReportEditor({ reportId }: { reportId: string }) {
         if (cancelled) return;
         setReport(loaded);
         setContent(loaded.content_json);
+        setFormat(getPresentationFormatForReport(reportId));
         try {
           const photos = await getEventPhotos(loaded.event_id);
           if (cancelled) return;
@@ -63,14 +68,24 @@ export function ReportEditor({ reportId }: { reportId: string }) {
       if (!current) return current;
       const sections = current.sections.map((section, currentSectionIndex) => {
         if (currentSectionIndex !== sectionIndex) return section;
+        const blocks = section.blocks.map((block, currentBlockIndex) =>
+          currentBlockIndex === blockIndex ? { ...block, text } : block,
+        );
+        const needsReview = isPresentationMode && blocks.every((block) => !block.text.trim());
         return {
           ...section,
-          blocks: section.blocks.map((block, currentBlockIndex) =>
-            currentBlockIndex === blockIndex ? { ...block, text } : block,
-          ),
+          blocks,
+          needs_review: isPresentationMode ? needsReview : section.needs_review,
+          review_notes: isPresentationMode
+            ? (needsReview ? ["Add verified event details for this reference section before export."] : [])
+            : section.review_notes,
         };
       });
-      return { ...current, sections };
+      return {
+        ...current,
+        sections,
+        missing_facts: isPresentationMode ? sections.filter((section) => section.needs_review).map((section) => section.title) : current.missing_facts,
+      };
     });
   }
 
@@ -275,7 +290,7 @@ export function ReportEditor({ reportId }: { reportId: string }) {
       </section>
 
       {/* Live Preview Column */}
-      <Preview content={content} status={report.status} photos={photoPreviews} />
+      <Preview content={content} status={report.status} photos={photoPreviews} format={format} />
     </div>
   );
 }
@@ -298,10 +313,11 @@ function WarningList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function Preview({ content, status, photos }: {
+function Preview({ content, status, photos, format }: {
   content: ReportContent;
   status: ReportResponse["status"];
   photos: Array<ReportPhoto & { url: string }>;
+  format: PresentationFormat | null;
 }) {
   return (
     <article className="h-fit rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm lg:sticky lg:top-20">
@@ -315,15 +331,18 @@ function Preview({ content, status, photos }: {
         </span>
       </div>
 
-      <div className="mt-6 rounded-xl border border-slate-100 bg-slate-50/40 p-6">
-        <h1 className="text-center text-xl sm:text-2xl font-extrabold text-slate-900 pb-4 border-b border-dashed border-slate-200">
+      <div
+        className="mt-6 rounded-xl border border-slate-100 bg-slate-50/40 p-6"
+        style={{ fontFamily: format?.style.font_family, fontSize: format ? `${format.style.body_font_size_pt}pt` : undefined, textAlign: format?.style.body_alignment }}
+      >
+        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 pb-4 border-b border-dashed border-slate-200" style={{ textAlign: format?.style.heading_alignment ?? "center" }}>
           {content.title}
         </h1>
 
         <div className="mt-6 space-y-6">
           {content.sections.map((section) => (
             <section key={section.key}>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700" style={{ textAlign: format?.style.heading_alignment }}>
                 {section.title}
               </h2>
               <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate-600">

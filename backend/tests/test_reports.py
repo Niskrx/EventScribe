@@ -4,7 +4,7 @@ import json
 import httpx
 from fastapi.testclient import TestClient
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.main import app
 from app.schemas.format_spec import FormatSpecification
 from app.services.ai.gemini import GeminiAdapter
@@ -66,7 +66,29 @@ def test_report_adapter_returns_validated_content() -> None:
     assert [section.key for section in content.sections] == ["introduction", "outcomes"]
 
 
-def test_generation_requires_analyzed_format_and_reports_missing_ai_config() -> None:
+def test_report_adapter_restores_reference_order_and_titles() -> None:
+    reversed_content = sample_content()
+    reversed_content["sections"] = list(reversed(reversed_content["sections"]))
+    reversed_content["sections"][0]["title"] = "Different model title"
+    response_body = {"candidates": [{"content": {"parts": [{"text": json.dumps(reversed_content)}]}}]}
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=response_body)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            adapter = GeminiAdapter(Settings(gemini_api_key="test-key", gemini_model="test-model"), http_client)
+            return await adapter.generate_report_content(EVENT_PAYLOAD, SPECIFICATION)
+
+    content = asyncio.run(run())
+    assert [(section.key, section.title) for section in content.sections] == [
+        ("introduction", "Introduction"),
+        ("outcomes", "Outcomes"),
+    ]
+
+
+def test_generation_requires_analyzed_format_and_reports_missing_ai_config(monkeypatch) -> None:
+    monkeypatch.setitem(app.dependency_overrides, get_settings, lambda: Settings(gemini_api_key=None, gemini_model=None))
     profile_response = client.post(
         "/api/formats/text",
         json={"name": "Seminar format", "description": "Use introduction and outcomes sections."},

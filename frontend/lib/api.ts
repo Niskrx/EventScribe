@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { deletePresentationPhotos, getPresentationPhotos, savePresentationPhoto, type ReportPhoto } from "@/lib/presentation-photos";
+import { analyzeReferenceFile, analyzeTextFormat, asPresentationFormat, type PresentationFormat } from "@/lib/presentation-format";
+import { presentationContent } from "@/lib/presentation-report";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const GUEST_SESSION_KEY = "eventscribe-guest-session-token";
@@ -89,55 +91,21 @@ function writePresentation<T>(key: string, value: T[]): void {
   }
 }
 
-function presentationContent(event: EventDraft): ReportContent {
-  return {
-    schema_version: "1.0",
-    title: event.title,
-    missing_facts: [],
-    sections: [
-      {
-        key: "overview",
-        title: "Event Overview",
-        needs_review: false,
-        review_notes: [],
-        blocks: [{
-          kind: "paragraph",
-          text: `${event.title} was conducted on ${event.event_date} by ${event.department} at ${event.venue}. The event was coordinated by ${event.coordinator}${event.guest ? `, with ${event.guest} as the distinguished guest or speaker.` : "."}`,
-          items: [],
-        }],
-      },
-      {
-        key: "objectives",
-        title: "Objectives",
-        needs_review: false,
-        review_notes: [],
-        blocks: [{ kind: "paragraph", text: event.objectives, items: [] }],
-      },
-      {
-        key: "activities",
-        title: "Activities and Execution",
-        needs_review: false,
-        review_notes: [],
-        blocks: [{ kind: "paragraph", text: event.activities, items: [] }],
-      },
-      {
-        key: "outcomes",
-        title: "Outcomes and Impact",
-        needs_review: false,
-        review_notes: [],
-        blocks: [{ kind: "paragraph", text: event.outcomes, items: [] }],
-      },
-      ...(event.additional_facts
-        ? [{
-            key: "additional-facts",
-            title: "Additional Verified Facts",
-            needs_review: false,
-            review_notes: [],
-            blocks: [{ kind: "paragraph" as const, text: event.additional_facts, items: [] }],
-          }]
-        : []),
-    ],
-  };
+function presentationFormatForEvent(event: CreatedEvent): PresentationFormat {
+  const profile = readPresentation<FormatProfileResponse>(PRESENTATION_FORMATS_KEY)
+    .find((item) => item.id === event.format_profile_id);
+  const format = asPresentationFormat(profile?.format_spec ?? null);
+  if (!format || profile?.analysis_status !== "ready") {
+    throw new Error("The reference format has not been analyzed. Recreate this report with a readable PDF/DOCX or a list of headings.");
+  }
+  return format;
+}
+
+export function getPresentationFormatForReport(reportId: string): PresentationFormat | null {
+  if (!presentationMode) return null;
+  const report = presentationReport(reportId);
+  const event = readPresentation<CreatedEvent>(PRESENTATION_EVENTS_KEY).find((item) => item.id === report.event_id);
+  return event ? presentationFormatForEvent(event) : null;
 }
 
 function presentationReport(reportId: string): ReportResponse {
@@ -334,14 +302,15 @@ export async function deleteReport(reportId: string): Promise<void> {
 
 export async function createTextFormat(name: string, description: string): Promise<FormatProfileResponse> {
   if (presentationMode) {
+    const format = analyzeTextFormat(description, name);
     const profile: FormatProfileResponse = {
       id: demoId(),
       user_id: presentationUserId(),
       name,
       source_type: "text",
       source_storage_path: null,
-      analysis_status: "pending",
-      format_spec: null,
+      analysis_status: "ready",
+      format_spec: format as unknown as Record<string, unknown>,
       analysis_error: null,
       created_at: new Date().toISOString(),
     };
@@ -358,14 +327,15 @@ export async function createTextFormat(name: string, description: string): Promi
 
 export async function createFileFormat(name: string, file: File): Promise<FormatProfileResponse> {
   if (presentationMode) {
+    const format = await analyzeReferenceFile(file);
     const profile: FormatProfileResponse = {
       id: demoId(),
       user_id: presentationUserId(),
       name,
       source_type: file.name.toLowerCase().endsWith(".docx") ? "docx" : "pdf",
       source_storage_path: file.name,
-      analysis_status: "pending",
-      format_spec: null,
+      analysis_status: "ready",
+      format_spec: format as unknown as Record<string, unknown>,
       analysis_error: null,
       created_at: new Date().toISOString(),
     };
@@ -387,14 +357,8 @@ export async function analyzeFormat(profileId: string): Promise<FormatProfileRes
     const profiles = readPresentation<FormatProfileResponse>(PRESENTATION_FORMATS_KEY);
     const profile = profiles.find((item) => item.id === profileId);
     if (!profile) throw new Error("Presentation format profile not found.");
-    const analyzed = {
-      ...profile,
-      analysis_status: "ready" as const,
-      format_spec: { presentation: true },
-      analysis_error: null,
-    };
-    writePresentation(PRESENTATION_FORMATS_KEY, profiles.map((item) => item.id === profileId ? analyzed : item));
-    return analyzed;
+    if (!asPresentationFormat(profile.format_spec)) throw new Error("The reference format could not be analyzed.");
+    return profile;
   }
   const response = await authenticatedFetch(`${apiBaseUrl}/api/formats/${profileId}/analyze`, {
     method: "POST",
@@ -406,12 +370,13 @@ export async function generateReport(eventId: string): Promise<ReportResponse> {
   if (presentationMode) {
     const event = readPresentation<CreatedEvent>(PRESENTATION_EVENTS_KEY).find((item) => item.id === eventId);
     if (!event) throw new Error("Presentation event not found.");
+    const format = presentationFormatForEvent(event);
     const existing = readPresentation<ReportResponse>(PRESENTATION_REPORTS_KEY).find((item) => item.event_id === eventId);
     const report: ReportResponse = {
       id: existing?.id ?? demoId(),
       event_id: event.id,
       user_id: event.user_id,
-      content_json: presentationContent(event),
+      content_json: presentationContent(event, format),
       content_version: existing ? existing.content_version + 1 : 1,
       status: "ready",
       generation_model: "presentation-preview",
@@ -456,11 +421,14 @@ export async function downloadReportFile(reportId: string, fileType: "docx" | "p
   if (presentationMode) {
     const report = presentationReport(reportId);
     if (!report.content_json) throw new Error("Report content is not ready.");
+    const event = readPresentation<CreatedEvent>(PRESENTATION_EVENTS_KEY).find((item) => item.id === report.event_id);
+    if (!event) throw new Error("Presentation event not found.");
+    const format = presentationFormatForEvent(event);
     const photos = await getPresentationPhotos(report.event_id);
     const { presentationDocx, presentationPdf } = await import("@/lib/presentation-export");
     return fileType === "pdf"
-      ? presentationPdf(report.content_json, photos)
-      : presentationDocx(report.content_json, photos);
+      ? presentationPdf(report.content_json, photos, format)
+      : presentationDocx(report.content_json, photos, format);
   }
   const response = await authenticatedFetch(`${apiBaseUrl}/api/reports/${reportId}/download/${fileType}`);
   if (!response.ok) {
