@@ -36,6 +36,16 @@ def _configure_document(document: Document, specification: FormatSpecification) 
 
 
 def _add_block(document: Document, block: ReportBlock, specification: FormatSpecification) -> None:
+    if block.kind == "table":
+        if not block.rows:
+            return
+        column_count = max(len(row) for row in block.rows)
+        table = document.add_table(rows=len(block.rows), cols=column_count)
+        table.style = "Table Grid"
+        for row_index, row in enumerate(block.rows):
+            for column_index, value in enumerate(row):
+                table.cell(row_index, column_index).text = value
+        return
     if block.kind == "paragraph":
         paragraph = document.add_paragraph(block.text)
         paragraph.alignment = _alignment(specification.style.body_alignment)

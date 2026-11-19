@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 
 
 class ReportBlock(BaseModel):
-    kind: Literal["paragraph", "bullet", "numbered"] = "paragraph"
+    kind: Literal["paragraph", "bullet", "numbered", "table"] = "paragraph"
     text: str = ""
     items: list[str] = Field(default_factory=list, max_length=50)
+    rows: list[list[str]] = Field(default_factory=list, max_length=50)
 
 
 class ReportSection(BaseModel):

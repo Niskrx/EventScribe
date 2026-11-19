@@ -30,7 +30,7 @@ export type EventDraft = {
 
 export type CreatedEvent = EventDraft & { id: string; user_id: string; status: string };
 
-export type ReportBlock = { kind: "paragraph" | "bullet" | "numbered"; text: string; items: string[] };
+export type ReportBlock = { kind: "paragraph" | "bullet" | "numbered" | "table"; text: string; items: string[]; rows?: string[][] };
 export type ReportSection = { key: string; title: string; blocks: ReportBlock[]; needs_review: boolean; review_notes: string[] };
 export type ReportContent = { schema_version: "1.0"; title: string; sections: ReportSection[]; missing_facts: string[] };
 export type ReportResponse = {

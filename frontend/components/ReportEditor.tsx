@@ -204,14 +204,28 @@ export function ReportEditor({ reportId }: { reportId: string }) {
 
             <div className="mt-4 space-y-3">
               {section.blocks.map((block, blockIndex) => (
-                <textarea
-                  key={`${section.key}-${blockIndex}`}
-                  value={block.text}
-                  onChange={(event) => updateSectionText(sectionIndex, blockIndex, event.target.value)}
-                  rows={4}
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 transition-all"
-                  aria-label={`${section.title} block ${blockIndex + 1}`}
-                />
+                block.kind === "table" ? (
+                  <div key={`${section.key}-${blockIndex}`} className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-left text-sm">
+                      <tbody>
+                        {(block.rows ?? []).map((row, rowIndex) => (
+                          <tr key={`${section.key}-${blockIndex}-row-${rowIndex}`} className={rowIndex === 0 ? "bg-slate-50 font-semibold" : "border-t border-slate-100"}>
+                            {row.map((cell, cellIndex) => <td key={`${section.key}-${blockIndex}-${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top">{cell}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <textarea
+                    key={`${section.key}-${blockIndex}`}
+                    value={block.text}
+                    onChange={(event) => updateSectionText(sectionIndex, blockIndex, event.target.value)}
+                    rows={4}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 transition-all"
+                    aria-label={`${section.title} block ${blockIndex + 1}`}
+                  />
+                )
               ))}
             </div>
           </section>
@@ -347,7 +361,11 @@ function Preview({ content, status, photos, format }: {
               </h2>
               <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate-600">
                 {section.blocks.map((block, index) => (
-                  <p key={`${section.key}-preview-${index}`}>{block.text || "[Empty block]"}</p>
+                  block.kind === "table" ? (
+                    <table key={`${section.key}-preview-${index}`} className="min-w-full border-collapse text-left text-xs">
+                      <tbody>{(block.rows ?? []).map((row, rowIndex) => <tr key={`${section.key}-preview-${index}-row-${rowIndex}`} className="border-b border-slate-200">{row.map((cell, cellIndex) => <td key={`${section.key}-preview-${index}-${rowIndex}-${cellIndex}`} className="px-2 py-1">{cell}</td>)}</tr>)}</tbody>
+                    </table>
+                  ) : <p key={`${section.key}-preview-${index}`}>{block.text || "[Empty block]"}</p>
                 ))}
               </div>
             </section>
