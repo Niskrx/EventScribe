@@ -81,19 +81,23 @@ class GeminiAdapter:
             f"{self.settings.gemini_api_base_url.rstrip('/')}/models/"
             f"{self.settings.gemini_model}:generateContent"
         )
+        schema_instruction = (
+            "\n\nReturn JSON only. The JSON must conform to this schema exactly. "
+            "Do not add markdown fences or explanatory text:\n"
+            f"{json.dumps(schema, ensure_ascii=False)}"
+        )
         payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "contents": [{"role": "user", "parts": [{"text": prompt + schema_instruction}]}],
             "generationConfig": {
                 "temperature": 0.1,
                 "responseMimeType": "application/json",
-                "responseJsonSchema": schema,
             },
         }
         headers = {"x-goog-api-key": self.settings.gemini_api_key}
 
         try:
             if self.client is None:
-                async with httpx.AsyncClient(timeout=45) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(90, connect=10)) as client:
                     response = await client.post(endpoint, headers=headers, json=payload)
             else:
                 response = await self.client.post(endpoint, headers=headers, json=payload)
@@ -104,27 +108,8 @@ class GeminiAdapter:
             raise GeminiError("AI_QUOTA_EXCEEDED", "Gemini free-tier quota or rate limit was reached.", retryable=True)
         if response.status_code in {500, 502, 503, 504}:
             raise GeminiError("AI_UNAVAILABLE", "Gemini is temporarily unavailable.", retryable=True)
-        if response.status_code == 400:
-            # Some Gemini models reject Pydantic's JSON Schema dialect even though
-            # they support JSON MIME output. Retry without responseJsonSchema and
-            # validate the returned JSON against our Pydantic model locally.
-            fallback_payload = {
-                "contents": payload["contents"],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "responseMimeType": "application/json",
-                },
-            }
-            try:
-                if self.client is None:
-                    async with httpx.AsyncClient(timeout=45) as client:
-                        response = await client.post(endpoint, headers=headers, json=fallback_payload)
-                else:
-                    response = await self.client.post(endpoint, headers=headers, json=fallback_payload)
-            except httpx.HTTPError as exc:
-                raise GeminiError("AI_UNAVAILABLE", "Gemini could not be reached.", retryable=True) from exc
         if response.status_code >= 400:
-            raise GeminiError("AI_REQUEST_FAILED", "Gemini rejected the structured generation request.")
+            raise GeminiError("AI_REQUEST_FAILED", "Gemini rejected the JSON generation request.")
 
         try:
             payload = response.json()
