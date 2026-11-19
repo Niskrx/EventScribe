@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { deletePresentationPhotos, getPresentationPhotos, savePresentationPhoto, type ReportPhoto } from "@/lib/presentation-photos";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const GUEST_SESSION_KEY = "eventscribe-guest-session-token";
@@ -7,6 +8,7 @@ const PRESENTATION_EVENTS_KEY = "eventscribe-presentation-events";
 const PRESENTATION_FORMATS_KEY = "eventscribe-presentation-formats";
 const PRESENTATION_REPORTS_KEY = "eventscribe-presentation-reports";
 const presentationMode = !supabase;
+export const isPresentationMode = presentationMode;
 
 export type EventDraft = {
   title: string;
@@ -138,15 +140,6 @@ function presentationContent(event: EventDraft): ReportContent {
   };
 }
 
-function presentationReportText(report: ReportResponse): string {
-  const sections = report.content_json?.sections ?? [];
-  return [
-    report.content_json?.title ?? "Event Report",
-    "",
-    ...sections.flatMap((section) => [section.title, ...section.blocks.map((block) => block.text), ""]),
-  ].join("\n");
-}
-
 function presentationReport(reportId: string): ReportResponse {
   const report = readPresentation<ReportResponse>(PRESENTATION_REPORTS_KEY).find((item) => item.id === reportId);
   if (!report) throw new Error("Presentation report not found.");
@@ -160,40 +153,6 @@ function savePresentationReport(report: ReportResponse): ReportResponse {
   else reports[index] = report;
   writePresentation(PRESENTATION_REPORTS_KEY, reports);
   return report;
-}
-
-function createPresentationPdf(report: ReportResponse): Blob {
-  const lines = presentationReportText(report)
-    .normalize("NFKD")
-    .replace(/[^\x20-\x7E\n]/g, "?")
-    .split("\n")
-    .flatMap((line) => line.match(/.{1,90}/g) ?? [""]);
-  const escapePdfText = (line: string) => line.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-  const stream = [
-    "BT",
-    "/F1 12 Tf",
-    "50 760 Td",
-    ...lines.slice(0, 38).map((line, index) => `${index ? "0 -18 Td\n" : ""}(${escapePdfText(line)}) Tj`),
-    "ET",
-  ].join("\n");
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`,
-  ];
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  for (const [index, object] of objects.entries()) {
-    offsets.push(new TextEncoder().encode(pdf).length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  }
-  const xrefOffset = new TextEncoder().encode(pdf).length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  pdf += offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n");
-  pdf += `\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return new Blob([pdf], { type: "application/pdf" });
 }
 
 async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -279,7 +238,7 @@ export async function createEvent(event: EventDraft): Promise<CreatedEvent> {
 }
 
 export async function uploadEventPhoto(eventId: string, file: File, caption?: string): Promise<void> {
-  if (presentationMode) return;
+  if (presentationMode) return savePresentationPhoto(eventId, file, caption);
   const formData = new FormData();
   formData.append("file", file);
   if (caption) formData.append("caption", caption);
@@ -288,6 +247,35 @@ export async function uploadEventPhoto(eventId: string, file: File, caption?: st
     body: formData,
   });
   await parseResponse(response);
+}
+
+export async function getEventPhotos(eventId: string): Promise<ReportPhoto[]> {
+  if (presentationMode) return getPresentationPhotos(eventId);
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/events/${eventId}/photos`, { cache: "no-store" });
+  const records = await parseResponse<Array<{
+    id: string;
+    original_filename: string;
+    caption: string | null;
+    sort_order: number;
+  }>>(response);
+  return Promise.all(records.map(async (record) => {
+    const imageResponse = await authenticatedFetch(`${apiBaseUrl}/api/events/${eventId}/photos/${record.id}/file`);
+    if (!imageResponse.ok) throw new Error(`Could not load ${record.original_filename}.`);
+    const blob = await imageResponse.blob();
+    const dimensions = await createImageBitmap(blob);
+    const photo: ReportPhoto = {
+      id: record.id,
+      eventId,
+      name: record.original_filename,
+      caption: record.caption,
+      blob,
+      width: dimensions.width,
+      height: dimensions.height,
+      order: record.sort_order,
+    };
+    dimensions.close();
+    return photo;
+  }));
 }
 
 export async function getReport(reportId: string): Promise<ReportResponse> {
@@ -332,6 +320,8 @@ export async function retryReport(reportId: string): Promise<ReportResponse> {
 
 export async function deleteReport(reportId: string): Promise<void> {
   if (presentationMode) {
+    const report = presentationReport(reportId);
+    await deletePresentationPhotos(report.event_id);
     writePresentation(
       PRESENTATION_REPORTS_KEY,
       readPresentation<ReportResponse>(PRESENTATION_REPORTS_KEY).filter((item) => item.id !== reportId),
@@ -465,10 +455,12 @@ export async function convertReportPdf(reportId: string): Promise<ReportResponse
 export async function downloadReportFile(reportId: string, fileType: "docx" | "pdf"): Promise<Blob> {
   if (presentationMode) {
     const report = presentationReport(reportId);
-    if (fileType === "pdf") return createPresentationPdf(report);
-    return new Blob([presentationReportText(report)], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
+    if (!report.content_json) throw new Error("Report content is not ready.");
+    const photos = await getPresentationPhotos(report.event_id);
+    const { presentationDocx, presentationPdf } = await import("@/lib/presentation-export");
+    return fileType === "pdf"
+      ? presentationPdf(report.content_json, photos)
+      : presentationDocx(report.content_json, photos);
   }
   const response = await authenticatedFetch(`${apiBaseUrl}/api/reports/${reportId}/download/${fileType}`);
   if (!response.ok) {

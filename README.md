@@ -107,6 +107,8 @@ The backend health check is accessible at `http://localhost:8000/api/health`.
 
 Follow these steps to test or demonstrate the complete application workflow:
 
+When Supabase is not configured, the frontend opens a **Presentation Preview** without sign-in. In this mode, event facts and reports are saved in this browser, photographs are stored in browser photo storage, and DOCX/PDF exports include those photographs. The preview uses the entered facts to build the report; AI generation and automatic reference-format analysis require the configured backend. Keep the same browser for the demonstration, and attach photos when creating a new report because earlier preview reports did not retain uploads.
+
 ### Step 1: Authentication
 1. Navigate to `http://localhost:3000/login` (or `/signup` to register).
 2. Enter your email and password.
@@ -125,8 +127,8 @@ Follow these steps to test or demonstrate the complete application workflow:
 3. *Form validation*: leaving any required field blank will highlight the field in red with an inline error message and scroll directly to the first invalid field.
 4. *Attach photographs*:
    - Click the photo picker to select JPEG, PNG, or WebP images.
-   - Selected files display file name chips and size indicators (max 8 MB per photo, up to 20 photos).
-   - Click **Remove** beside any photo chip to unattach it prior to submitting.
+   - Selected files show thumbnails and sizes (max 8 MB per photo, up to 20 photos).
+   - Add optional captions, use the arrow controls to set the gallery order, or remove a photo before submitting.
 5. Click **"Save event draft"**. While processing, the button disables and displays live upload progress.
 
 ### Step 3: Choose reference format & generate report
@@ -135,7 +137,7 @@ Follow these steps to test or demonstrate the complete application workflow:
 3. Click **"Generate Report"**. Gemini creates structured academic prose matching the exact sections of your format specification using only verified input facts.
 
 ### Step 4: Review, edit & export
-1. Review generated sections in the interactive editor at `/reports/[reportId]/edit`.
+1. Review generated sections and the photo gallery in the interactive editor at `/reports/[reportId]/edit`.
 2. Modify paragraphs or list items if adjustments are needed, then save the updated version.
 3. Click **"Render DOCX"** to construct the formatted Word document with embedded photograph galleries.
 4. Click **"Convert to PDF"** to produce the final submission-ready PDF.

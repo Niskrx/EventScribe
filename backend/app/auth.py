@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import secrets
+from dataclasses import dataclass
 from uuid import uuid4
 
 import httpx

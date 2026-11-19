@@ -20,7 +20,7 @@ export default function NewReportPage() {
             Create Event Report
           </h1>
           <p className="mt-2 text-sm text-slate-600 max-w-2xl">
-            Enter verified event details, provide the department reference format, and attach event photographs. EventScribe will analyze the reference through the backend before generating your report.
+            Enter verified event details, provide a department reference format, and attach event photographs. You can review and export the resulting report.
           </p>
         </div>
 

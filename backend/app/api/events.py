@@ -1,6 +1,8 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.auth import get_request_user_id
 from app.config import Settings, get_settings
@@ -13,6 +15,8 @@ from app.services.local_event_store import (
     event_response,
     get_event,
     get_photo,
+    list_event_photos,
+    photo_response,
     reorder_photos,
     update_event,
 )
@@ -87,6 +91,29 @@ async def upload_event_photo(
     if not PHOTO_SIGNATURES[file.content_type](data):
         raise HTTPException(status_code=422, detail="The uploaded file is not a valid photograph.")
     return add_photo(event, data=data, original_filename=file.filename or "photo", mime_type=file.content_type, caption=caption)
+
+
+@router.get("/{event_id}/photos", response_model=list[PhotoResponse])
+async def read_event_photos(event_id: UUID, user_id: str = Depends(get_request_user_id)) -> list[PhotoResponse]:
+    event = _owned_event_or_404(event_id, user_id)
+    return [photo_response(photo) for photo in list_event_photos(event)]
+
+
+@router.get("/{event_id}/photos/{photo_id}/file")
+async def read_event_photo_file(
+    event_id: UUID,
+    photo_id: UUID,
+    user_id: str = Depends(get_request_user_id),
+) -> FileResponse:
+    event = _owned_event_or_404(event_id, user_id)
+    photo = get_photo(photo_id, event)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    storage_root = (Path(__file__).resolve().parents[2] / ".local_storage").resolve()
+    file_path = (storage_root / photo.storage_path).resolve()
+    if storage_root not in file_path.parents or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Photo file not found.")
+    return FileResponse(file_path, media_type=photo.mime_type, filename=photo.original_filename, content_disposition_type="inline")
 
 
 @router.patch("/{event_id}/photos/order", response_model=list[PhotoResponse])

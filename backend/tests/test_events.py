@@ -54,6 +54,19 @@ def test_photo_upload_order_and_delete() -> None:
     assert first.json()["sort_order"] == 0
     assert first.json()["caption"] == "Opening session"
 
+    photo_list = client.get(f"/api/events/{event_id}/photos")
+    assert photo_list.status_code == 200
+    assert [photo["id"] for photo in photo_list.json()] == [first_id, second_id]
+    photo_file = client.get(f"/api/events/{event_id}/photos/{first_id}/file")
+    assert photo_file.status_code == 200
+    assert photo_file.content == b"\xff\xd8\xff\xe0sample"
+
+    other_user_file = client.get(
+        f"/api/events/{event_id}/photos/{first_id}/file",
+        headers={"X-EventScribe-User": "different-user"},
+    )
+    assert other_user_file.status_code == 404
+
     reorder = client.patch(f"/api/events/{event_id}/photos/order", json=[second_id, first_id])
     assert reorder.status_code == 200
     assert [photo["id"] for photo in reorder.json()] == [second_id, first_id]

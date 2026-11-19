@@ -1,16 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import {
   convertReportPdf,
   downloadReportFile,
+  getEventPhotos,
   getReport,
   renderReport,
   ReportContent,
   ReportResponse,
   updateReportContent,
 } from "@/lib/api";
+import type { ReportPhoto } from "@/lib/presentation-photos";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 
@@ -21,16 +24,35 @@ export function ReportEditor({ reportId }: { reportId: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [photoPreviews, setPhotoPreviews] = useState<Array<ReportPhoto & { url: string }>>([]);
 
   useEffect(() => {
+    let cancelled = false;
+    let objectUrls: string[] = [];
     getReport(reportId)
-      .then((loaded) => {
+      .then(async (loaded) => {
+        if (cancelled) return;
         setReport(loaded);
         setContent(loaded.content_json);
+        try {
+          const photos = await getEventPhotos(loaded.event_id);
+          if (cancelled) return;
+          const previews = photos.map((photo) => ({ ...photo, url: URL.createObjectURL(photo.blob) }));
+          objectUrls = previews.map((photo) => photo.url);
+          setPhotoPreviews(previews);
+        } catch (photoError: unknown) {
+          if (!cancelled) {
+            setMessage(photoError instanceof Error ? photoError.message : "Photographs could not be loaded.");
+          }
+        }
       })
-      .catch((loadError: unknown) =>
-        setError(loadError instanceof Error ? loadError.message : "The report could not be loaded."),
-      );
+      .catch((loadError: unknown) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : "The report could not be loaded.");
+      });
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, [reportId]);
 
   if (error) return <ErrorState description={error} />;
@@ -253,7 +275,7 @@ export function ReportEditor({ reportId }: { reportId: string }) {
       </section>
 
       {/* Live Preview Column */}
-      <Preview content={content} status={report.status} />
+      <Preview content={content} status={report.status} photos={photoPreviews} />
     </div>
   );
 }
@@ -276,7 +298,11 @@ function WarningList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function Preview({ content, status }: { content: ReportContent; status: ReportResponse["status"] }) {
+function Preview({ content, status, photos }: {
+  content: ReportContent;
+  status: ReportResponse["status"];
+  photos: Array<ReportPhoto & { url: string }>;
+}) {
   return (
     <article className="h-fit rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm lg:sticky lg:top-20">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -308,6 +334,29 @@ function Preview({ content, status }: { content: ReportContent; status: ReportRe
             </section>
           ))}
         </div>
+
+        {photos.length > 0 ? (
+          <section className="mt-8 border-t border-slate-200 pt-6">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Photographs ({photos.length})</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {photos.map((photo) => (
+                <figure key={photo.id} className="rounded-lg border border-slate-200 bg-white p-2">
+                  <Image
+                    src={photo.url}
+                    alt={photo.caption ?? photo.name}
+                    width={photo.width}
+                    height={photo.height}
+                    unoptimized
+                    className="h-40 w-full rounded-md object-contain"
+                  />
+                  <figcaption className="mt-2 truncate text-center text-xs text-slate-600" title={photo.caption ?? photo.name}>
+                    {photo.caption ?? photo.name}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </article>
   );

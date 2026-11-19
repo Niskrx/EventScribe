@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useState } from "react";
+import Image from "next/image";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import {
   analyzeFormat,
@@ -10,6 +11,7 @@ import {
   createTextFormat,
   EventDraft,
   generateReport,
+  isPresentationMode,
   uploadEventPhoto,
 } from "@/lib/api";
 
@@ -29,6 +31,7 @@ const MAX_PHOTOS = 20; // 20 photos limit matching backend config
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type ValidationErrors = Partial<Record<keyof EventDraft, string>>;
+type SelectedPhoto = { id: string; file: File; caption: string };
 
 type SubmitFeedback =
   | { type: "success"; message: string; details?: string; eventId?: string; reportId?: string }
@@ -47,7 +50,7 @@ export function EventForm() {
   const [formatDescription, setFormatDescription] = useState("");
   const [formatFile, setFormatFile] = useState<File | null>(null);
   const [formatError, setFormatError] = useState<string | null>(null);
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [photoWarnings, setPhotoWarnings] = useState<string[]>([]);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [feedback, setFeedback] = useState<SubmitFeedback>(null);
@@ -81,7 +84,8 @@ export function EventForm() {
         warnings.push(`"${file.name}" (${formatFileSize(file.size)}) exceeds the 8 MB maximum limit.`);
         continue;
       }
-      const isDuplicate = photos.some((p) => p.name === file.name && p.size === file.size);
+      const isDuplicate = photos.some((photo) => photo.file.name === file.name && photo.file.size === file.size)
+        || validNewPhotos.some((photo) => photo.name === file.name && photo.size === file.size);
       if (isDuplicate) {
         warnings.push(`"${file.name}" has already been attached.`);
         continue;
@@ -94,7 +98,11 @@ export function EventForm() {
       warnings.push(`You can attach up to ${MAX_PHOTOS} photos. Added the first ${availableSlots} files.`);
     }
 
-    const photosToAdd = validNewPhotos.slice(0, Math.max(0, availableSlots));
+    const photosToAdd = validNewPhotos.slice(0, Math.max(0, availableSlots)).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      caption: "",
+    }));
     setPhotos((prev) => [...prev, ...photosToAdd]);
     setPhotoWarnings(warnings);
     event.target.value = "";
@@ -102,6 +110,20 @@ export function EventForm() {
 
   function removePhoto(indexToRemove: number) {
     setPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  }
+
+  function movePhoto(index: number, offset: number) {
+    setPhotos((current) => {
+      const nextIndex = index + offset;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const reordered = [...current];
+      [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+      return reordered;
+    });
+  }
+
+  function updatePhotoCaption(id: string, caption: string) {
+    setPhotos((current) => current.map((photo) => photo.id === id ? { ...photo, caption } : photo));
   }
 
   function clearAllPhotos() {
@@ -220,7 +242,7 @@ export function EventForm() {
 
       for (let i = 0; i < photos.length; i++) {
         setUploadProgress({ current: i + 1, total: photos.length });
-        await uploadEventPhoto(created.id, photos[i]);
+        await uploadEventPhoto(created.id, photos[i].file, photos[i].caption);
       }
 
       const report = await generateReport(created.id);
@@ -464,7 +486,9 @@ export function EventForm() {
         </div>
 
         <p className="text-sm leading-relaxed text-slate-600">
-          Give EventScribe the format your department expects. Upload a PDF/DOCX reference, or describe the format in text. The backend will extract and analyze it before generating the report.
+          {isPresentationMode
+            ? "Upload a PDF/DOCX reference or describe the required format. This presentation preview records your choice; automatic format analysis is available after the backend is configured."
+            : "Give EventScribe the format your department expects. Upload a PDF/DOCX reference, or describe the format in text. The backend will extract and analyze it before generating the report."}
         </p>
 
         <Field
@@ -534,7 +558,7 @@ export function EventForm() {
               </svg>
             </div>
             <p className="mt-3 text-sm font-semibold text-slate-800">
-              Click to select or drop event photographs
+              Click to select event photographs
             </p>
             <p className="mt-1 text-xs text-slate-500">
               Supports JPEG, PNG, or WebP (max 8 MB per image, up to {MAX_PHOTOS} photos)
@@ -585,33 +609,35 @@ export function EventForm() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {photos.map((photo, index) => (
                   <div
-                    key={`${photo.name}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-2xs"
+                    key={photo.id}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-2xs"
                   >
-                    <div className="flex items-center gap-2.5 truncate pr-2">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                        </svg>
-                      </span>
-                      <div className="truncate">
-                        <p className="truncate font-semibold text-slate-800" title={photo.name}>
-                          {photo.name}
-                        </p>
-                        <p className="text-[11px] text-slate-400">{formatFileSize(photo.size)}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <PhotoThumbnail file={photo.file} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-800" title={photo.file.name}>
+                            {photo.file.name}
+                          </p>
+                          <p className="text-[11px] text-slate-400">{formatFileSize(photo.file.size)}</p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button type="button" onClick={() => movePhoto(index, -1)} disabled={isSubmitting || index === 0} aria-label={`Move ${photo.file.name} up`} className="rounded px-1.5 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40">↑</button>
+                        <button type="button" onClick={() => movePhoto(index, 1)} disabled={isSubmitting || index === photos.length - 1} aria-label={`Move ${photo.file.name} down`} className="rounded px-1.5 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40">↓</button>
+                        <button type="button" onClick={() => removePhoto(index)} disabled={isSubmitting} aria-label={`Remove ${photo.file.name}`} className="rounded px-1.5 py-1 text-rose-600 hover:bg-rose-50 disabled:opacity-40">×</button>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
+                    <input
+                      type="text"
+                      value={photo.caption}
+                      maxLength={500}
+                      onChange={(event) => updatePhotoCaption(photo.id, event.target.value)}
                       disabled={isSubmitting}
-                      aria-label={`Remove ${photo.name}`}
-                      className="shrink-0 p-1 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                      aria-label={`Caption for ${photo.file.name}`}
+                      placeholder="Caption (optional)"
+                      className="mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-500"
+                    />
                   </div>
                 ))}
               </div>
@@ -623,7 +649,9 @@ export function EventForm() {
       {/* Submission Bar */}
       <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-xs text-slate-500">
-          The reference will be analyzed by the backend before your report is generated.
+          {isPresentationMode
+            ? "Presentation preview: photos and reports are saved in this browser."
+            : "The reference will be analyzed by the backend before your report is generated."}
         </p>
 
         <button
@@ -654,6 +682,21 @@ export function EventForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+function PhotoThumbnail({ file }: { file: File }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const previewUrl = URL.createObjectURL(file);
+    setUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [file]);
+
+  return url ? (
+    <Image src={url} alt={file.name} width={44} height={44} unoptimized className="h-11 w-11 shrink-0 rounded-md object-cover" />
+  ) : (
+    <span className="h-11 w-11 shrink-0 rounded-md bg-indigo-50" />
   );
 }
 
